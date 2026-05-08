@@ -13,7 +13,6 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 /**
@@ -40,17 +39,10 @@ public class PdfTextExtractor {
             int pageCount = doc.getNumberOfPages();
             log.info("pdf parse: pages={} bytes={}", pageCount, pdfBytes.length);
 
-            // 逐页抽文本；setStartPage/setEndPage 是 1-based
-            PDFTextStripper stripper = new PDFTextStripper();
-            List<String> pageTexts = new ArrayList<>(pageCount);
-            for (int i = 1; i <= pageCount; i++) {
-                stripper.setStartPage(i);
-                stripper.setEndPage(i);
-                pageTexts.add(stripper.getText(doc));
-            }
-
-            List<Bookmark> bookmarks = extractBookmarks(doc);
-            return new Extracted(pageCount, pageTexts, bookmarks);
+            return new Extracted(
+                    pageCount,
+                    extractPageTexts(doc, pageCount),
+                    extractBookmarks(doc));
         } catch (IOException e) {
             throw new PdfParseException("PDF 解析失败: " + e.getMessage(), e);
         }
@@ -66,13 +58,17 @@ public class PdfTextExtractor {
      */
     public static String textForPageRange(Extracted extract, int pageStart, int pageEnd) {
         if (extract == null || extract.getPageTexts() == null) return "";
-        int total = extract.getPageTexts().size();
-        int start = Math.max(1, pageStart);
-        int end = Math.min(total, Math.max(start, pageEnd));
+
+        List<String> pageTexts = extract.getPageTexts();
+        int safeStart = Math.max(1, pageStart);
+        int safeEnd = Math.min(pageTexts.size(), Math.max(safeStart, pageEnd));
+
         StringBuilder sb = new StringBuilder();
-        for (int i = start; i <= end; i++) {
-            sb.append(extract.getPageTexts().get(i - 1));
-            if (!sb.toString().endsWith("\n")) sb.append('\n');
+        for (int page = safeStart; page <= safeEnd; page++) {
+            String pageText = pageTexts.get(page - 1);
+            sb.append(pageText);
+            // 保证页与页之间至少一个换行——PDFBox 抽出的页文本可能不含 trailing \n
+            if (!pageText.endsWith("\n")) sb.append('\n');
         }
         return sb.toString();
     }
@@ -86,65 +82,86 @@ public class PdfTextExtractor {
      * @return 拼接后的文本
      */
     public static String headAndTailText(Extracted extract, int headPages, int tailPages) {
-        int total = extract.getPageCount();
-        if (total <= headPages + tailPages) {
-            return textForPageRange(extract, 1, total);
+        int totalPages = extract.getPageCount();
+        if (totalPages <= headPages + tailPages) {
+            return textForPageRange(extract, 1, totalPages);
         }
-        StringBuilder sb = new StringBuilder();
-        sb.append("=== 前 ").append(headPages).append(" 页 ===\n");
-        sb.append(textForPageRange(extract, 1, headPages));
-        sb.append("\n=== 后 ").append(tailPages).append(" 页 ===\n");
-        sb.append(textForPageRange(extract, total - tailPages + 1, total));
-        return sb.toString();
+        return "=== 前 " + headPages + " 页 ===\n"
+                + textForPageRange(extract, 1, headPages)
+                + "\n=== 后 " + tailPages + " 页 ===\n"
+                + textForPageRange(extract, totalPages - tailPages + 1, totalPages);
     }
 
-    private List<Bookmark> extractBookmarks(PDDocument doc) {
+    // ----------------------------------------------------------- private helpers
+
+    /** 逐页抽文本；PDFTextStripper 是有状态的，setStartPage/setEndPage 后 getText 取该页。 */
+    private static List<String> extractPageTexts(PDDocument doc, int pageCount) throws IOException {
+        PDFTextStripper stripper = new PDFTextStripper();
+        List<String> pageTexts = new ArrayList<>(pageCount);
+        for (int page = 1; page <= pageCount; page++) {
+            stripper.setStartPage(page);
+            stripper.setEndPage(page);
+            pageTexts.add(stripper.getText(doc));
+        }
+        return pageTexts;
+    }
+
+    /** 抽书签并扁平化。无目录时返回空列表（不为 null）。 */
+    private static List<Bookmark> extractBookmarks(PDDocument doc) {
         PDDocumentOutline outline = doc.getDocumentCatalog().getDocumentOutline();
-        if (outline == null) return Collections.emptyList();
-        List<Bookmark> result = new ArrayList<>();
-        walk(outline.getFirstChild(), 0, doc, result);
-        return result;
+        if (outline == null) return List.of();
+
+        List<Bookmark> collected = new ArrayList<>();
+        flattenOutline(outline.getFirstChild(), 0, doc, collected);
+        return collected;
     }
 
-    private void walk(PDOutlineItem item, int level, PDDocument doc, List<Bookmark> out) {
-        while (item != null) {
-            Integer page = resolvePage(item, doc);
+    /** 深度优先遍历书签树，把每一项附加到 collected。 */
+    private static void flattenOutline(PDOutlineItem first, int level,
+                                       PDDocument doc, List<Bookmark> collected) {
+        for (PDOutlineItem item = first; item != null; item = item.getNextSibling()) {
             String title = item.getTitle();
             if (title != null && !title.isBlank()) {
-                out.add(new Bookmark(title.trim(), level, page));
+                collected.add(new Bookmark(title.trim(), level, resolveBookmarkPage(item, doc)));
             }
             if (item.getFirstChild() != null) {
-                walk(item.getFirstChild(), level + 1, doc, out);
+                flattenOutline(item.getFirstChild(), level + 1, doc, collected);
             }
-            item = item.getNextSibling();
         }
     }
 
-    /** 解析书签指向的页码为 1-based int；解析不出来时返回 null。 */
-    private Integer resolvePage(PDOutlineItem item, PDDocument doc) {
+    /**
+     * 解析书签指向的 1-based 页码；解析不出来时返回 null。
+     *
+     * 两条路径：
+     *   1. item.getDestination() 直接是 PDPageDestination —— 大多数 PDF 走这条
+     *   2. 走 GoTo action 嵌套 destination —— 部分工具生成的 PDF 用这种
+     */
+    private static Integer resolveBookmarkPage(PDOutlineItem item, PDDocument doc) {
         try {
-            PDPageDestination dest = (item.getDestination() instanceof PDPageDestination)
-                    ? (PDPageDestination) item.getDestination()
-                    : null;
-            if (dest == null && item.getAction() != null) {
-                // GoTo action 也可能内嵌目标
-                PDPage p = item.findDestinationPage(doc);
-                if (p != null) {
-                    return doc.getPages().indexOf(p) + 1;
+            if (item.getDestination() instanceof PDPageDestination dest) {
+                PDPage page = dest.getPage();
+                if (page != null) {
+                    return pageIndex1Based(doc, page);
                 }
-                return null;
+                int explicitIndex = dest.getPageNumber();
+                return explicitIndex >= 0 ? explicitIndex + 1 : null;
             }
-            if (dest == null) return null;
-            PDPage page = dest.getPage();
-            if (page != null) {
-                return doc.getPages().indexOf(page) + 1;
+            if (item.getAction() != null) {
+                PDPage page = item.findDestinationPage(doc);
+                if (page != null) {
+                    return pageIndex1Based(doc, page);
+                }
             }
-            int idx = dest.getPageNumber();
-            return idx >= 0 ? idx + 1 : null;
+            return null;
         } catch (IOException e) {
             log.debug("resolve bookmark page failed for '{}': {}", item.getTitle(), e.toString());
             return null;
         }
+    }
+
+    private static int pageIndex1Based(PDDocument doc, PDPage page) {
+        return doc.getPages().indexOf(page) + 1;
     }
 
     // ----------------------------------------------------------- value types
