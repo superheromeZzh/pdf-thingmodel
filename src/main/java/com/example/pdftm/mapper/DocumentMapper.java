@@ -28,4 +28,13 @@ public interface DocumentMapper {
      * @return 概览 DTO；文档不存在时返回 null
      */
     DocumentOverview findOverview(@Param("documentId") Long documentId);
+
+    /**
+     * 写入新文档。BIGSERIAL 主键由数据库分配，回填到入参对象的 {@code documentId} 字段，
+     * 调用方拿这个 id 去插 document_chunks。
+     *
+     * @param document 待写入对象；执行后其 {@code documentId} 会被填上数据库分配的值
+     * @return 受影响行数（正常 1）
+     */
+    int insert(Document document);
 }

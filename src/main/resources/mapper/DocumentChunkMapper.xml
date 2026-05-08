@@ -52,6 +52,24 @@
         LIMIT #{size} OFFSET #{offset}
     </select>
 
+    <!--
+        Stage 2 ingestion 写入。chunk_id 由 BIGSERIAL 回填。
+        (document_id, chunk_name) 上有 UNIQUE 约束，重复时数据库会抛异常，
+        调用方负责把它转成 DataIntegrityViolationException 处理或跳过。
+    -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="chunkId" keyColumn="chunk_id">
+        INSERT INTO document_chunks (
+            document_id, chunk_name, page_start, page_end, raw_text, summary
+        ) VALUES (
+            #{documentId},
+            #{chunkName},
+            #{pageStart},
+            #{pageEnd},
+            #{rawText},
+            #{summary}
+        )
+    </insert>
+
     <select id="countChunkSummaries" resultType="long">
         SELECT COUNT(*) FROM document_chunks WHERE document_id = #{documentId}
     </select>

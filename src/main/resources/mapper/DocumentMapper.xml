@@ -30,6 +30,19 @@
         SELECT * FROM documents WHERE document_id = #{documentId} LIMIT 1
     </select>
 
+    <!--
+        Stage 0/1 ingestion 写入。useGeneratedKeys 让 BIGSERIAL 回填到 documentId。
+        skeleton_json 显式声明 typeHandler，避免 jsonb 列被当字符串塞。
+    -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="documentId" keyColumn="document_id">
+        INSERT INTO documents (document_name, page_count, skeleton_json)
+        VALUES (
+            #{documentName},
+            #{pageCount},
+            #{skeletonJson,jdbcType=OTHER,typeHandler=com.example.pdftm.handler.JsonbTypeHandler}
+        )
+    </insert>
+
     <select id="findOverview" resultMap="DocumentOverviewResult">
         SELECT
             d.document_id,

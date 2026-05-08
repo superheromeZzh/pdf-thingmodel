@@ -54,4 +54,15 @@ public interface DocumentChunkMapper {
      * @return 该文档下的 chunk 总数；文档不存在返回 0
      */
     long countChunkSummaries(@Param("documentId") Long documentId);
+
+    /**
+     * 写入新 chunk。BIGSERIAL 主键由数据库分配，回填到入参对象的 {@code chunkId} 字段，
+     * 调用方拿这个 id 给 thing_models.upsert 用。
+     *
+     * <p>(document_id, chunk_name) 唯一；重复会抛 {@code DataIntegrityViolationException}。
+     *
+     * @param chunk 待写入对象；执行后其 {@code chunkId} 会被填上数据库分配的值
+     * @return 受影响行数（正常 1）
+     */
+    int insert(DocumentChunk chunk);
 }

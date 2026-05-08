@@ -6,7 +6,7 @@ import org.apache.ibatis.type.BaseTypeHandler;
 import org.apache.ibatis.type.JdbcType;
 import org.apache.ibatis.type.MappedJdbcTypes;
 import org.apache.ibatis.type.MappedTypes;
-import org.postgresql.util.PGobject;
+import org.opengauss.util.PGobject;
 
 import java.sql.CallableStatement;
 import java.sql.PreparedStatement;
@@ -26,7 +26,9 @@ import java.sql.SQLException;
  *   - 写入参数：#{model,jdbcType=OTHER,typeHandler=com.example.pdftm.handler.JsonbTypeHandler}
  *
  * 注意：
- *  - PGobject 来自 openGauss-jdbc / postgresql 驱动，两者都 export 这个类。
+ *  - PGobject 取自 openGauss-jdbc 的 org.opengauss.util.PGobject。
+ *    切到原生 PostgreSQL 驱动时，把 import 换成 org.postgresql.util.PGobject 即可，
+ *    两个类 API 完全一致（openGauss 是 PG 驱动的 fork）。
  *  - 写入时 type 必须是 "jsonb"，否则 GaussDB 会按字符串存到 jsonb 列里
  *    引发 "column ... is of type jsonb but expression is of type text" 错误。
  */

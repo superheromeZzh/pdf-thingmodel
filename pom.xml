@@ -25,10 +25,17 @@
     </properties>
 
     <dependencies>
-        <!-- Web (可选，仅在你之后要加 Controller 时用得到；此处保留以便启动 actuator) -->
+        <!-- Web：HTTP upload + REST controller -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter</artifactId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- PDF 解析：Apache PDFBox（提取页文本、目录、页数） -->
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>3.0.2</version>
         </dependency>
 
         <!-- MyBatis (Spring Boot 3 兼容版本) -->
