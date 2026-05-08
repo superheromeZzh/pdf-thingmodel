@@ -1,0 +1,41 @@
+package com.example.pdftm.service;
+
+import com.example.pdftm.domain.ThingModel;
+import com.example.pdftm.mapper.ThingModelMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * thing_models 写入服务。
+ *
+ * 精简版只剩一个动作：upsert(chunkId, model)。
+ * 没有版本/审计/乐观锁——并发写最后写者胜，调用方需自己控制冲突。
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class ModificationService {
+
+    private final ThingModelMapper thingModelMapper;
+
+    /**
+     * 写入或覆盖某 chunk 的物模型，返回最终生效的 ThingModel。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public ThingModel upsertModel(Long chunkId, JsonNode model) {
+        if (chunkId == null) throw new IllegalArgumentException("chunkId required");
+        if (model == null)   throw new IllegalArgumentException("model required");
+
+        thingModelMapper.upsert(chunkId, model);
+        log.info("upsertModel: chunkId={} modelKeys={}", chunkId,
+                model.isObject() ? model.size() : -1);
+
+        ThingModel saved = new ThingModel();
+        saved.setChunkId(chunkId);
+        saved.setModel(model);
+        return saved;
+    }
+}

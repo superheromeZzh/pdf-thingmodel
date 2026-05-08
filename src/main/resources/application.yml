@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: pdf-thingmodel
+  datasource:
+    # 走 openGauss 官方驱动；如果你的 GaussDB 实例是 PostgreSQL 兼容版，可以把
+    # url 换成 jdbc:postgresql://... 并把驱动改成 org.postgresql.Driver
+    driver-class-name: org.opengauss.Driver
+    url: jdbc:opengauss://127.0.0.1:5432/pdftm?currentSchema=public
+    username: pdftm
+    password: ${DB_PASSWORD:please-change-me}
+    hikari:
+      maximum-pool-size: 16
+      minimum-idle: 2
+      connection-timeout: 5000
+      pool-name: pdftm-pool
+
+mybatis:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  # 扫描 com.example.pdftm.handler 下的 TypeHandler（包含 JsonbTypeHandler）
+  type-handlers-package: com.example.pdftm.handler
+  # 预留 XML mapper 位置；目前所有 mapper 都用注解写，不强制存在
+  mapper-locations: classpath*:mapper/**/*.xml
+
+logging:
+  level:
+    com.example.pdftm: DEBUG
+    org.mybatis: INFO

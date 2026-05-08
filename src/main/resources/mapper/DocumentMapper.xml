@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.pdftm.mapper.DocumentMapper">
+
+    <!--
+        skeleton_json (JSONB) 显式指定 JsonbTypeHandler；
+        其它列依赖 mybatis 的下划线 → 驼峰自动映射（application.yml: map-underscore-to-camel-case=true）。
+    -->
+    <resultMap id="DocumentResult" type="com.example.pdftm.domain.Document">
+        <id     column="document_id"   property="documentId"/>
+        <result column="document_name" property="documentName"/>
+        <result column="page_count"    property="pageCount"/>
+        <result column="skeleton_json" property="skeletonJson"
+                typeHandler="com.example.pdftm.handler.JsonbTypeHandler"/>
+        <result column="created_at"    property="createdAt"/>
+    </resultMap>
+
+    <resultMap id="DocumentOverviewResult" type="com.example.pdftm.dto.DocumentOverview">
+        <result column="document_id"   property="documentId"/>
+        <result column="document_name" property="documentName"/>
+        <result column="page_count"    property="pageCount"/>
+        <result column="skeleton_json" property="skeletonJson"
+                typeHandler="com.example.pdftm.handler.JsonbTypeHandler"/>
+        <result column="created_at"    property="createdAt"/>
+        <result column="total_chunks"  property="totalChunks"/>
+    </resultMap>
+
+    <select id="selectById" resultMap="DocumentResult">
+        SELECT * FROM documents WHERE document_id = #{documentId} LIMIT 1
+    </select>
+
+    <select id="findOverview" resultMap="DocumentOverviewResult">
+        SELECT
+            d.document_id,
+            d.document_name,
+            d.page_count,
+            d.skeleton_json,
+            d.created_at,
+            COUNT(c.chunk_id) AS total_chunks
+        FROM documents d
+        LEFT JOIN document_chunks c ON c.document_id = d.document_id
+        WHERE d.document_id = #{documentId}
+        GROUP BY d.document_id, d.document_name, d.page_count, d.skeleton_json, d.created_at
+    </select>
+
+</mapper>

@@ -1,0 +1,31 @@
+# Maven
+target/
+*.class
+
+# IntelliJ / Eclipse / VS Code
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.classpath
+.project
+.settings/
+.factorypath
+.springBeans
+.sts4-cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Local environment overrides
+.env
+.env.local
+application-local.yml
+application-local.yaml
+src/main/resources/application-local.*

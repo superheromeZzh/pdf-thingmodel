@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.pdftm.mapper.DocumentChunkMapper">
+
+    <resultMap id="DocumentChunkResult" type="com.example.pdftm.domain.DocumentChunk">
+        <id     column="chunk_id"    property="chunkId"/>
+        <result column="document_id" property="documentId"/>
+        <result column="chunk_name"  property="chunkName"/>
+        <result column="page_start"  property="pageStart"/>
+        <result column="page_end"    property="pageEnd"/>
+        <result column="raw_text"    property="rawText"/>
+        <result column="summary"     property="summary"/>
+        <result column="created_at"  property="createdAt"/>
+    </resultMap>
+
+    <resultMap id="ChunkListItemResult" type="com.example.pdftm.dto.ChunkListItem">
+        <result column="chunk_id"   property="chunkId"/>
+        <result column="chunk_name" property="chunkName"/>
+        <result column="page_start" property="pageStart"/>
+        <result column="page_end"   property="pageEnd"/>
+        <result column="summary"    property="summary"/>
+        <result column="has_model"  property="hasModel"/>
+    </resultMap>
+
+    <select id="selectById" resultMap="DocumentChunkResult">
+        SELECT * FROM document_chunks WHERE chunk_id = #{chunkId} LIMIT 1
+    </select>
+
+    <select id="listByDocument" resultMap="DocumentChunkResult">
+        SELECT * FROM document_chunks
+        WHERE document_id = #{documentId}
+        ORDER BY page_start, chunk_id
+    </select>
+
+    <!--
+        chunk 列表（轻量）：LEFT JOIN thing_models 只为算 has_model（是否已生成物模型），
+        不返回 model 主体，列表页响应大小可控。
+    -->
+    <select id="listChunkSummaries" resultMap="ChunkListItemResult">
+        SELECT
+            c.chunk_id,
+            c.chunk_name,
+            c.page_start,
+            c.page_end,
+            c.summary,
+            (tm.chunk_id IS NOT NULL) AS has_model
+        FROM document_chunks c
+        LEFT JOIN thing_models tm ON tm.chunk_id = c.chunk_id
+        WHERE c.document_id = #{documentId}
+        ORDER BY c.page_start, c.chunk_id
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="countChunkSummaries" resultType="long">
+        SELECT COUNT(*) FROM document_chunks WHERE document_id = #{documentId}
+    </select>
+
+</mapper>
