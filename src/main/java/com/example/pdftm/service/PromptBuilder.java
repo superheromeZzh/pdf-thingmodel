@@ -21,6 +21,14 @@ public class PromptBuilder {
     public static final int MAX_GLOSSARY_ENTRIES = 40;
     private static final int TOKEN_DIVISOR = 3;
 
+    /**
+     * 拼装 LLM 编辑物模型用的 system + user 双段消息。
+     *
+     * @param context           当前 chunk 的上下文（骨架 + chunk + 当前物模型）
+     * @param thingModelSchema  物模型 JSON Schema（可空）
+     * @param userRequest       用户原话
+     * @return 拼好的双段 prompt + 估算 token 数；输入非法时抛 {@link IllegalArgumentException}
+     */
     public PromptMessages buildEditPrompt(ChunkContext context,
                                           String thingModelSchema,
                                           String userRequest) {

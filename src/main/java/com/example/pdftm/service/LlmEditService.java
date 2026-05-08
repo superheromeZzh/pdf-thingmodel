@@ -59,6 +59,15 @@ public class LlmEditService {
     private final PromptBuilder promptBuilder;
     private final LlmClient llmClient;
 
+    /**
+     * 自然语言修改：基于当前物模型 + 用户请求生成新模型并落库，返回前后对照视图。
+     *
+     * @param chunkId          目标 chunk 主键
+     * @param userRequest      用户原话
+     * @param thingModelSchema 物模型 JSON Schema（可空，传 null 则跳过 schema 校验）
+     * @param options          LLM 调用参数（可空，使用 {@link LlmCallOptions#defaultsForEdit()}）
+     * @return 前后对照视图；连续 {@link #MAX_ATTEMPTS} 次失败抛 {@link LlmOutputInvalidException}
+     */
     public EditPreview edit(Long chunkId,
                             String userRequest,
                             String thingModelSchema,

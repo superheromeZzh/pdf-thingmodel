@@ -14,29 +14,21 @@ public interface DocumentChunkMapper {
     /**
      * 按主键查询单条 chunk（含 raw_text 原文）。
      *
-     * <p>DocumentQueryService.inspectChunk 和 ChunkContextService.loadByChunkId 都走这里。
-     *
      * @param chunkId chunk 主键
      * @return chunk 对象；不存在时返回 null
      */
     DocumentChunk selectById(@Param("chunkId") Long chunkId);
 
     /**
-     * 列出某文档下所有 chunk，按 page_start, chunk_id 升序——给"展示文档大纲"用。
-     *
-     * <p>不分页，调用方需要保证文档 chunk 数量不会过大；列表页应该走
-     * {@link #listChunkSummaries(Long, int, int)} 而不是这个方法。
+     * 列出某文档下所有 chunk，按 page_start, chunk_id 升序，不分页。
      *
      * @param documentId 文档主键
-     * @return chunk 列表；文档不存在或没有 chunk 时返回空列表（不会返回 null）
+     * @return chunk 列表；文档不存在或没有 chunk 时返回空列表
      */
     List<DocumentChunk> listByDocument(@Param("documentId") Long documentId);
 
     /**
-     * 列表页轻量查询：每行带 has_model 标志（thing_models 是否已生成对应物模型）。
-     *
-     * <p>故意不返回 raw_text / model 主体，列表页响应大小可控。
-     * 配合 {@link #countChunkSummaries(Long)} 做分页 total。
+     * 列表页轻量查询：每行带 has_model 标志，故意不返回 raw_text / model 主体。
      *
      * @param documentId 文档主键
      * @param offset     LIMIT/OFFSET 中的 offset，从 0 开始
@@ -56,13 +48,10 @@ public interface DocumentChunkMapper {
     long countChunkSummaries(@Param("documentId") Long documentId);
 
     /**
-     * 写入新 chunk。BIGSERIAL 主键由数据库分配，回填到入参对象的 {@code chunkId} 字段，
-     * 调用方拿这个 id 给 thing_models.upsert 用。
+     * 写入新 chunk；执行后 BIGSERIAL 主键回填到入参的 chunkId 字段。
      *
-     * <p>(document_id, chunk_name) 唯一；重复会抛 {@code DataIntegrityViolationException}。
-     *
-     * @param chunk 待写入对象；执行后其 {@code chunkId} 会被填上数据库分配的值
-     * @return 受影响行数（正常 1）
+     * @param chunk 待写入对象
+     * @return 受影响行数；(document_id, chunk_name) 重复时抛 {@link org.springframework.dao.DataIntegrityViolationException}
      */
     int insert(DocumentChunk chunk);
 }

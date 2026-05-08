@@ -18,7 +18,7 @@ import java.util.regex.Pattern;
 /**
  * 阶段 3：单个 chunk 首次物模型解析。强模型一次调用 → JSON 校验 → upsert thing_models。
  *
- * <p>失败有限次重试（带前次错误反馈）。LLM 调用绝不放在事务内——upsertModel 内部各自短事务。
+ * 失败有限次重试（带前次错误反馈）。LLM 调用绝不放在事务内——upsertModel 内部各自短事务。
  */
 @Slf4j
 @Service
@@ -42,7 +42,11 @@ public class ChunkParseService {
     private String strongModel;
 
     /**
-     * 解析并写入物模型。成功返回 model JSON；失败抛 {@link LlmOutputInvalidException}。
+     * 调用强 LLM 解析单个 chunk 的物模型并 upsert 到 thing_models。
+     *
+     * @param skeletonJson 文档全局骨架
+     * @param chunk        当前 chunk（含 chunkId / rawText）
+     * @return 解析后的物模型 JSON；连续 {@link #MAX_ATTEMPTS} 次失败抛 {@link LlmOutputInvalidException}
      */
     public JsonNode parseAndSave(JsonNode skeletonJson, DocumentChunk chunk) {
         if (chunk == null || chunk.getChunkId() == null) {

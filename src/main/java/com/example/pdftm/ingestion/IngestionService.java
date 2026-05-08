@@ -16,7 +16,7 @@ import java.util.List;
 /**
  * PDF → documents → document_chunks → thing_models 的总编排。
  *
- * <p>同步流程（v1）：
+ * 同步流程（v1）：
  *   <ol>
  *     <li>PdfTextExtractor 抽页文本 + 书签</li>
  *     <li>SkeletonExtractor 用便宜 LLM 一次性产出骨架 + chunk 清单</li>
@@ -24,7 +24,7 @@ import java.util.List;
  *     <li>对每个 detected chunk: documentChunks.insert + ChunkParseService 跑物模型</li>
  *   </ol>
  *
- * <p>故意不在方法上加 @Transactional——多次 LLM 调用累计可能几十秒，
+ * 故意不在方法上加 @Transactional——多次 LLM 调用累计可能几十秒，
  * 整体放一个事务里会持有 DB 连接 + 锁太久。每个 mapper 调用各自走短事务；
  * 部分 chunk 失败不阻塞其他 chunk，最终在 IngestionResult.chunks 里按条目报状态。
  */
@@ -39,6 +39,13 @@ public class IngestionService {
     private final DocumentMapper documentMapper;
     private final DocumentChunkMapper documentChunkMapper;
 
+    /**
+     * 同步执行 PDF → documents → document_chunks → thing_models 的完整 ingestion 流程。
+     *
+     * @param fileName 文件名（写进 documents.document_name）
+     * @param pdfBytes PDF 字节流
+     * @return ingestion 结果，含每个 chunk 的最终状态
+     */
     public IngestionResult ingest(String fileName, byte[] pdfBytes) {
         // 1. PDF 解析
         PdfTextExtractor.Extracted extract = pdfTextExtractor.extract(pdfBytes);

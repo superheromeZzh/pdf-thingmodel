@@ -18,10 +18,10 @@ import java.time.Duration;
 /**
  * 阿里云灵积（DashScope）OpenAI 兼容模式接入。
  *
- * <p>不引入 dashscope-sdk-java，直接走 HTTP（端点：{@code /chat/completions}）。
+ * 不引入 dashscope-sdk-java，直接走 HTTP（端点：{@code /chat/completions}）。
  * 这样切其它 OpenAI 兼容服务（DeepSeek / Moonshot / 本地 vLLM ...）只要改 base-url + api-key + model 名。
  *
- * <p>本类只负责"把 system+user 两段 prompt 发出去、把 message.content 取回来"，
+ * 本类只负责"把 system+user 两段 prompt 发出去、把 message.content 取回来"，
  * JSON 解析与一致性校验是 LlmEditService / SkeletonExtractor / ChunkParseService 的事。
  */
 @Slf4j

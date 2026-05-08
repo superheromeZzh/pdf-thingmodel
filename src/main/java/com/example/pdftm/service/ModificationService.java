@@ -22,7 +22,11 @@ public class ModificationService {
     private final ThingModelMapper thingModelMapper;
 
     /**
-     * 写入或覆盖某 chunk 的物模型，返回最终生效的 ThingModel。
+     * 写入或覆盖某 chunk 的物模型并返回最终生效对象。
+     *
+     * @param chunkId 目标 chunk 主键
+     * @param model   完整的新物模型 JSON
+     * @return 写入后的 ThingModel（chunkId + model）
      */
     @Transactional(rollbackFor = Exception.class)
     public ThingModel upsertModel(Long chunkId, JsonNode model) {

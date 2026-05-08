@@ -20,12 +20,12 @@ import java.util.regex.Pattern;
 /**
  * 阶段 1：便宜 LLM 一次性产出文档骨架 + 检测到的 chunk 清单。
  *
- * <p>输入只送：
+ * 输入只送：
  *   - 文件名
  *   - 头 5 页 + 尾 5 页正文（context 节流）
  *   - 整本书签（PDFBox 抽取得到，是定位 chunk 边界的主要依据）
  *
- * <p>输出严格 JSON：
+ * 输出严格 JSON：
  * <pre>
  * {
  *   "skeleton": { documentMeta, summary, conventions, outline, sharedSchemas, apiIndex, glossary },
@@ -54,6 +54,13 @@ public class SkeletonExtractor {
     @Value("${llm.dashscope.cheap-model:qwen-turbo}")
     private String cheapModel;
 
+    /**
+     * 调用便宜 LLM 从 PDF 头尾正文 + 书签里抽出全局骨架与 chunk 清单。
+     *
+     * @param fileName 文件名（写进 prompt 给模型识别用）
+     * @param pdf      已解析的 PDF 内容
+     * @return 抽取结果；LLM 输出非法时抛 {@link com.example.pdftm.llm.LlmOutputInvalidException}
+     */
     public ExtractedSkeleton extract(String fileName, PdfTextExtractor.Extracted pdf) {
         if (pdf == null) throw new IllegalArgumentException("pdf required");
 

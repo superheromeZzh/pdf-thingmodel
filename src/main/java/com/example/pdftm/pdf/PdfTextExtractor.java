@@ -19,7 +19,7 @@ import java.util.List;
 /**
  * 用 PDFBox 把 PDF 字节流变成"分页文本 + 目录（书签）+ 总页数"。
  *
- * <p>本类只做"PDF → 结构化文本"，不写库、不调 LLM；上层 IngestionService 拼这些片段
+ * 本类只做"PDF → 结构化文本"，不写库、不调 LLM；上层 IngestionService 拼这些片段
  * 喂给 SkeletonExtractor。
  */
 @Slf4j
@@ -57,8 +57,12 @@ public class PdfTextExtractor {
     }
 
     /**
-     * 取 [pageStart, pageEnd] 闭区间内的拼接文本（1-based 页码）。
-     * 越界自动钳到合法范围。
+     * 取闭区间 [pageStart, pageEnd] 内（1-based）的拼接文本，越界自动钳到合法范围。
+     *
+     * @param extract   PDF 解析结果
+     * @param pageStart 起始页（1-based）
+     * @param pageEnd   结束页（1-based，闭区间）
+     * @return 拼接后的文本；extract 为 null 时返回空串
      */
     public static String textForPageRange(Extracted extract, int pageStart, int pageEnd) {
         if (extract == null || extract.getPageTexts() == null) return "";
@@ -74,8 +78,12 @@ public class PdfTextExtractor {
     }
 
     /**
-     * 取首 N 页 + 末 M 页的拼接文本，用于"骨架抽取"那一次便宜 LLM 调用。
-     * 当 PDF 总页数 ≤ headPages + tailPages 时退化为整篇返回。
+     * 取首 headPages 页 + 末 tailPages 页的拼接文本，文档不够长时退化为整篇返回。
+     *
+     * @param extract   PDF 解析结果
+     * @param headPages 取头部多少页
+     * @param tailPages 取尾部多少页
+     * @return 拼接后的文本
      */
     public static String headAndTailText(Extracted extract, int headPages, int tailPages) {
         int total = extract.getPageCount();

@@ -24,7 +24,7 @@ import java.util.Map;
 /**
  * 文档上传入口：multipart 上传 PDF，同步跑 ingestion，返回最终状态。
  *
- * <p>同步实现耗时取决于 PDF 大小 + chunk 数 + LLM 速度，可能 30 秒~几分钟；
+ * 同步实现耗时取决于 PDF 大小 + chunk 数 + LLM 速度，可能 30 秒~几分钟；
  * 客户端需要相应放宽超时。要异步化时切到 @Async 或队列即可。
  */
 @Slf4j
@@ -35,6 +35,12 @@ public class IngestionController {
 
     private final IngestionService ingestionService;
 
+    /**
+     * 接收 multipart 上传的 PDF，同步跑 ingestion 全流程。
+     *
+     * @param file 上传的 PDF 文件（multipart 字段名 file）
+     * @return 200 + IngestionResult；空文件或非 PDF 返回 400；读取上传流失败时抛 {@link IOException}
+     */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<IngestionResult> upload(@RequestParam("file") MultipartFile file) throws IOException {
         if (file == null || file.isEmpty()) {

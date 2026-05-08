@@ -34,11 +34,25 @@ public class DocumentQueryService {
     private final DocumentChunkMapper documentChunkMapper;
     private final ThingModelMapper thingModelMapper;
 
+    /**
+     * 查询文档首页卡片所需的概览数据。
+     *
+     * @param documentId 文档主键，可空
+     * @return 概览 DTO；documentId 为 null 或文档不存在时返回 null
+     */
     public DocumentOverview getOverview(Long documentId) {
         if (documentId == null) return null;
         return documentMapper.findOverview(documentId);
     }
 
+    /**
+     * 分页查询某文档下的 chunk 列表，每行带 has_model 标志。
+     *
+     * @param documentId 文档主键，可空
+     * @param page       1-based 页号；&lt; 1 钳到 1
+     * @param size       每页条数；越界钳到 [1, 200]
+     * @return 当前页 + 总数；documentId 为 null 时返回空页
+     */
     public ChunkListPage listChunks(Long documentId, int page, int size) {
         if (documentId == null) {
             return new ChunkListPage(Collections.emptyList(), 0, page, size);
@@ -53,8 +67,10 @@ public class DocumentQueryService {
     }
 
     /**
-     * 单 chunk 对照视图：用户点击列表行进入这个接口。
-     * 返回 chunk 元信息 + 当前生效物模型。
+     * 单 chunk 对照视图：返回 chunk 元信息 + 当前生效物模型。
+     *
+     * @param chunkId chunk 主键，可空
+     * @return 对照视图；chunkId 为 null 或不存在时返回 null
      */
     public ChunkInspectView inspectChunk(Long chunkId) {
         if (chunkId == null) return null;

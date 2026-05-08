@@ -37,7 +37,11 @@ public class ModelDiffService {
     );
 
     /**
-     * 计算 before → after 的差异。任意一边为 null 时按空对象处理。
+     * 计算 before → after 的差异，任意一边为 null 时按空对象处理。
+     *
+     * @param before 修改前的物模型 JSON
+     * @param after  修改后的物模型 JSON
+     * @return 差异结果（changes / summary / rawPatch 三件套）
      */
     public ModelDiff diff(JsonNode before, JsonNode after) {
         JsonNode b = (before == null) ? MAPPER.createObjectNode() : before;
