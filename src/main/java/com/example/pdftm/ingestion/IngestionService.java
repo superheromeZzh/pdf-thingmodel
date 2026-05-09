@@ -14,19 +14,23 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * PDF → documents → document_chunks → thing_models 的总编排。
+ * PDF → documents → document_chunks 的总编排（不含物模型解析）。
  *
- * 同步流程（v1）：
+ * 同步流程：
  *   <ol>
  *     <li>PdfTextExtractor 抽页文本 + 书签</li>
  *     <li>SkeletonExtractor 用便宜 LLM 一次性产出骨架 + chunk 清单</li>
  *     <li>DocumentMapper.insert 写 documents（拿到 documentId）</li>
- *     <li>对每个 detected chunk: documentChunks.insert + ChunkParseService 跑物模型</li>
+ *     <li>对每个 detected chunk: documentChunks.insert</li>
  *   </ol>
  *
- * 故意不在方法上加 @Transactional——多次 LLM 调用累计可能几十秒，
- * 整体放一个事务里会持有 DB 连接 + 锁太久。每个 mapper 调用各自走短事务；
- * 部分 chunk 失败不阻塞其他 chunk，最终在 IngestionResult.chunks 里按条目报状态。
+ * 物模型解析（thing_models）不在此处做，由后续 {@link ChunkParseService} 在用户
+ * 显式触发时按 chunk 解析。理由：1) 上传只想看到"文档+分块"是否就绪；
+ * 2) 强模型一次调用几秒到十几秒，N 个 chunk 串起来上传接口要等几分钟；
+ * 3) 解析失败应当是可重试的独立动作，不该污染上传的成败判断。
+ *
+ * 故意不在方法上加 @Transactional——LLM 调用（骨架抽取）放事务里会长时间持有 DB
+ * 连接。每个 mapper 调用各自走短事务；部分 chunk 入库失败不阻塞其他 chunk。
  */
 @Slf4j
 @Service
@@ -35,16 +39,16 @@ public class IngestionService {
 
     private final PdfTextExtractor pdfTextExtractor;
     private final SkeletonExtractor skeletonExtractor;
-    private final ChunkParseService chunkParseService;
     private final DocumentMapper documentMapper;
     private final DocumentChunkMapper documentChunkMapper;
 
     /**
-     * 同步执行 PDF → documents → document_chunks → thing_models 的完整 ingestion 流程。
+     * 同步执行 PDF → documents → document_chunks 的上传 ingestion 流程。
+     * 不解析 thing_models，物模型解析由调用方后续显式触发。
      *
      * @param fileName 文件名（写进 documents.document_name）
      * @param pdfBytes PDF 字节流
-     * @return ingestion 结果，含每个 chunk 的最终状态
+     * @return ingestion 结果，含每个 chunk 的入库状态
      */
     public IngestionResult ingest(String fileName, byte[] pdfBytes) {
         // 1. PDF 解析
@@ -64,9 +68,9 @@ public class IngestionService {
         log.info("ingest doc inserted: documentId={} detectedChunks={}",
                 doc.getDocumentId(), skeleton.getDetectedChunks().size());
 
-        // 4. 每 chunk 入库 + 物模型解析
+        // 4. 每个 chunk 入库
         List<ChunkIngestionStatus> statuses = new ArrayList<>(skeleton.getDetectedChunks().size());
-        int parsedCount = 0;
+        int insertedCount = 0;
         for (DetectedChunk dc : skeleton.getDetectedChunks()) {
             DocumentChunk chunk = new DocumentChunk();
             chunk.setDocumentId(doc.getDocumentId());
@@ -78,34 +82,24 @@ public class IngestionService {
 
             try {
                 documentChunkMapper.insert(chunk);
+                statuses.add(ChunkIngestionStatus.inserted(chunk.getChunkId(), chunk.getChunkName()));
+                insertedCount++;
             } catch (DataIntegrityViolationException e) {
                 log.warn("chunk insert failed (likely duplicate chunk_name '{}'): {}",
                         dc.getChunkName(), e.getMessage());
                 statuses.add(ChunkIngestionStatus.chunkInsertFailed(dc.getChunkName(), e.getMessage()));
-                continue;
-            }
-
-            // 5. 物模型解析（失败不阻塞别的 chunk）
-            try {
-                chunkParseService.parseAndSave(skeleton.getSkeletonJson(), chunk);
-                statuses.add(ChunkIngestionStatus.parsed(chunk.getChunkId(), chunk.getChunkName()));
-                parsedCount++;
-            } catch (Exception e) {
-                log.warn("chunk {} model parse failed: {}", chunk.getChunkId(), e.toString());
-                statuses.add(ChunkIngestionStatus.parseFailed(
-                        chunk.getChunkId(), chunk.getChunkName(), e.getMessage()));
             }
         }
 
-        log.info("ingest done: documentId={} parsed={}/{}",
-                doc.getDocumentId(), parsedCount, skeleton.getDetectedChunks().size());
+        log.info("ingest done: documentId={} inserted={}/{}",
+                doc.getDocumentId(), insertedCount, skeleton.getDetectedChunks().size());
 
         IngestionResult result = new IngestionResult();
         result.setDocumentId(doc.getDocumentId());
         result.setDocumentName(doc.getDocumentName());
         result.setPageCount(doc.getPageCount());
         result.setDetectedChunkCount(skeleton.getDetectedChunks().size());
-        result.setParsedChunkCount(parsedCount);
+        result.setInsertedChunkCount(insertedCount);
         result.setChunks(statuses);
         return result;
     }

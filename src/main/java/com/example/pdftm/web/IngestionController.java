@@ -2,12 +2,9 @@ package com.example.pdftm.web;
 
 import com.example.pdftm.ingestion.IngestionResult;
 import com.example.pdftm.ingestion.IngestionService;
-import com.example.pdftm.llm.LlmCallException;
-import com.example.pdftm.llm.LlmOutputInvalidException;
 import com.example.pdftm.pdf.PdfTextExtractor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -22,9 +19,10 @@ import java.io.InputStream;
 import java.util.Map;
 
 /**
- * 文档上传入口：multipart 上传 PDF，同步跑 ingestion，返回最终状态。
+ * 文档上传入口：multipart 上传 PDF，同步跑"PDF 抽取 + 骨架抽取 + chunk 入库"。
+ * 物模型解析不在这里跑（一次只解析骨架，速度可控），由后续 {@code POST /chunks/{chunkId}/parse} 触发。
  *
- * 同步实现耗时取决于 PDF 大小 + chunk 数 + LLM 速度，可能 30 秒~几分钟；
+ * 同步耗时取决于 PDF 大小 + 骨架抽取的便宜 LLM 一次调用，通常十秒级；
  * 客户端需要相应放宽超时。要异步化时切到 @Async 或队列即可。
  */
 @Slf4j
@@ -72,19 +70,5 @@ public class IngestionController {
     public ResponseEntity<Map<String, String>> handlePdfParse(PdfTextExtractor.PdfParseException e) {
         log.warn("pdf parse failed: {}", e.getMessage());
         return ResponseEntity.badRequest().body(Map.of("error", "pdf_parse_failed", "message", e.getMessage()));
-    }
-
-    @ExceptionHandler(LlmCallException.class)
-    public ResponseEntity<Map<String, String>> handleLlmCall(LlmCallException e) {
-        log.warn("llm call failed: {}", e.getMessage());
-        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
-                .body(Map.of("error", "llm_call_failed", "message", e.getMessage()));
-    }
-
-    @ExceptionHandler(LlmOutputInvalidException.class)
-    public ResponseEntity<Map<String, String>> handleLlmOutput(LlmOutputInvalidException e) {
-        log.warn("llm output invalid: {}", e.getMessage());
-        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
-                .body(Map.of("error", "llm_output_invalid", "message", e.getMessage()));
     }
 }

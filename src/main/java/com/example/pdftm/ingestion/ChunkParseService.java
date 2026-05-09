@@ -1,10 +1,13 @@
 package com.example.pdftm.ingestion;
 
+import com.example.pdftm.domain.Document;
 import com.example.pdftm.domain.DocumentChunk;
 import com.example.pdftm.dto.PromptMessages;
 import com.example.pdftm.llm.LlmCallOptions;
 import com.example.pdftm.llm.LlmClient;
 import com.example.pdftm.llm.LlmOutputInvalidException;
+import com.example.pdftm.mapper.DocumentChunkMapper;
+import com.example.pdftm.mapper.DocumentMapper;
 import com.example.pdftm.service.ModificationService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -13,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.util.NoSuchElementException;
 import java.util.regex.Pattern;
 
 /**
@@ -37,9 +41,33 @@ public class ChunkParseService {
 
     private final LlmClient llmClient;
     private final ModificationService modificationService;
+    private final DocumentMapper documentMapper;
+    private final DocumentChunkMapper documentChunkMapper;
 
     @Value("${llm.dashscope.strong-model:qwen-max}")
     private String strongModel;
+
+    /**
+     * 按 chunkId 触发物模型解析：从库里捞 chunk + 所属文档骨架，再走
+     * {@link #parseAndSave(JsonNode, DocumentChunk)}。upsert 语义，已存在的物模型会被覆盖。
+     *
+     * @param chunkId 已经入库的 chunk 主键
+     * @return 解析后的物模型 JSON
+     * @throws NoSuchElementException chunk 或所属 document 不存在
+     */
+    public JsonNode parseChunk(Long chunkId) {
+        if (chunkId == null) throw new IllegalArgumentException("chunkId required");
+        DocumentChunk chunk = documentChunkMapper.selectById(chunkId);
+        if (chunk == null) {
+            throw new NoSuchElementException("chunk not found: " + chunkId);
+        }
+        Document doc = documentMapper.selectById(chunk.getDocumentId());
+        if (doc == null) {
+            throw new NoSuchElementException(
+                    "document not found for chunk " + chunkId + ": documentId=" + chunk.getDocumentId());
+        }
+        return parseAndSave(doc.getSkeletonJson(), chunk);
+    }
 
     /**
      * 调用强 LLM 解析单个 chunk 的物模型并 upsert 到 thing_models。

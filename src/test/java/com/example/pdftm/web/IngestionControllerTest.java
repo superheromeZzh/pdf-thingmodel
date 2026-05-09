@@ -61,7 +61,7 @@ class IngestionControllerTest {
                 .andExpect(jsonPath("$.documentId").value(42L))
                 .andExpect(jsonPath("$.documentName").value("test.pdf"))
                 .andExpect(jsonPath("$.detectedChunkCount").value(1))
-                .andExpect(jsonPath("$.parsedChunkCount").value(1));
+                .andExpect(jsonPath("$.insertedChunkCount").value(1));
 
         verify(ingestionService).ingest(
                 eq("test.pdf"),
@@ -128,8 +128,8 @@ class IngestionControllerTest {
         r.setDocumentName(fileName);
         r.setPageCount(3);
         r.setDetectedChunkCount(1);
-        r.setParsedChunkCount(1);
-        r.setChunks(List.of(ChunkIngestionStatus.parsed(101L, "Chapter 1")));
+        r.setInsertedChunkCount(1);
+        r.setChunks(List.of(ChunkIngestionStatus.inserted(101L, "Chapter 1")));
         return r;
     }
 
