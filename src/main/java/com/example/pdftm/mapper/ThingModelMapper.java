@@ -1,6 +1,6 @@
 package com.example.pdftm.mapper;
 
-import com.example.pdftm.domain.ThingModel;
+import com.example.pdftm.domain.ChunkModel;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.apache.ibatis.annotations.Param;
 
@@ -17,7 +17,7 @@ public interface ThingModelMapper {
      * @param chunkId chunk 主键
      * @return 物模型对象；尚未生成时返回 null
      */
-    ThingModel findByChunkId(@Param("chunkId") Long chunkId);
+    ChunkModel findByChunkId(@Param("chunkId") Long chunkId);
 
     /**
      * 写入或覆盖某 chunk 的物模型；最后写者胜，无版本/审计/乐观锁。
@@ -36,6 +36,6 @@ public interface ThingModelMapper {
      * @param fragmentJson 要包含的 JSON 片段（字符串形式，由 SQL CAST 成 jsonb）
      * @return 命中的物模型列表；无命中返回空列表
      */
-    List<ThingModel> findContainingFragment(@Param("documentId") Long documentId,
+    List<ChunkModel> findContainingFragment(@Param("documentId") Long documentId,
                                             @Param("fragmentJson") String fragmentJson);
 }

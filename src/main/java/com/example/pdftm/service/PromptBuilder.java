@@ -1,7 +1,7 @@
 package com.example.pdftm.service;
 
 import com.example.pdftm.domain.DocumentChunk;
-import com.example.pdftm.domain.ThingModel;
+import com.example.pdftm.domain.ChunkModel;
 import com.example.pdftm.dto.ChunkContext;
 import com.example.pdftm.dto.PromptMessages;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -139,11 +139,11 @@ public class PromptBuilder {
 
         // 7) 当前物模型
         sb.append("\n# 当前物模型\n");
-        ThingModel current = ctx.getCurrentThingModel();
-        if (current == null || current.getModel() == null) {
+        ChunkModel current = ctx.getCurrentThingModel();
+        if (current == null || current.getThingModel() == null) {
             sb.append("(本 chunk 尚未生成物模型，本次修改将作为初始版本写入)\n{}\n");
         } else {
-            sb.append(current.getModel().toPrettyString()).append('\n');
+            sb.append(current.getThingModel().toPrettyString()).append('\n');
         }
 
         // 8) 原文片段（截断）

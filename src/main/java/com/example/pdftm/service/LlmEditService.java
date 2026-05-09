@@ -1,6 +1,6 @@
 package com.example.pdftm.service;
 
-import com.example.pdftm.domain.ThingModel;
+import com.example.pdftm.domain.ChunkModel;
 import com.example.pdftm.dto.ChunkContext;
 import com.example.pdftm.dto.EditPreview;
 import com.example.pdftm.dto.LlmEditOutput;
@@ -76,9 +76,9 @@ public class LlmEditService {
         ChunkContext ctx = chunkContextService.loadByChunkId(chunkId);
         if (ctx.getCurrentThingModel() == null) {
             throw new IllegalStateException(
-                    "chunk " + chunkId + " has no current ThingModel; run parse first");
+                    "chunk " + chunkId + " has no current ChunkModel; run parse first");
         }
-        final JsonNode currentModel = ctx.getCurrentThingModel().getModel();
+        final JsonNode currentModel = ctx.getCurrentThingModel().getThingModel();
 
         LlmCallOptions opts = (options != null) ? options : LlmCallOptions.defaultsForEdit();
         StringBuilder cumulativeRequest = new StringBuilder(userRequest);
@@ -103,8 +103,8 @@ public class LlmEditService {
                 validateNewModel(out.getNewModel(), thingModelSchema);
                 verifyPatchEqualsNewModel(currentModel, out.getPatch(), out.getNewModel());
 
-                ThingModel saved = modificationService.upsertModel(chunkId, out.getNewModel());
-                ModelDiff diff = modelDiffService.diff(currentModel, saved.getModel());
+                ChunkModel saved = modificationService.upsertModel(chunkId, out.getNewModel());
+                ModelDiff diff = modelDiffService.diff(currentModel, saved.getThingModel());
 
                 log.info("edit success: chunkId={} attempts={} changes={}",
                         chunkId, attempt, diff.getChanges().size());
@@ -112,7 +112,7 @@ public class LlmEditService {
                 return EditPreview.builder()
                         .chunkId(chunkId)
                         .beforeModel(currentModel)
-                        .afterModel(saved.getModel())
+                        .afterModel(saved.getThingModel())
                         .diff(diff)
                         .explanation(out.getExplanation())
                         .warnings(out.getWarnings())

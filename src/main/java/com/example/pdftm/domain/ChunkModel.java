@@ -10,11 +10,11 @@ import java.time.OffsetDateTime;
  * 不保留版本/审计 —— 写入是 upsert，最后写者胜。
  */
 @Data
-public class ThingModel {
+public class ChunkModel {
 
     private Long chunkId;
 
-    private JsonNode model;
+    private JsonNode thingModel;
 
     private OffsetDateTime createdAt;
 

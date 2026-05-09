@@ -1,8 +1,8 @@
 package com.example.pdftm.service;
 
+import com.example.pdftm.domain.ChunkModel;
 import com.example.pdftm.domain.Document;
 import com.example.pdftm.domain.DocumentChunk;
-import com.example.pdftm.domain.ThingModel;
 import com.example.pdftm.dto.ChunkContext;
 import com.example.pdftm.mapper.DocumentChunkMapper;
 import com.example.pdftm.mapper.DocumentMapper;
@@ -40,7 +40,7 @@ public class ChunkContextService {
         if (doc == null) {
             throw new IllegalArgumentException("document not found: " + chunk.getDocumentId());
         }
-        ThingModel current = thingModelMapper.findByChunkId(chunkId);
+        ChunkModel current = thingModelMapper.findByChunkId(chunkId);
 
         return ChunkContext.builder()
                 .skeleton(doc.getSkeletonJson())

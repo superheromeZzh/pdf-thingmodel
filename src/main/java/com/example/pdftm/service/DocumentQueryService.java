@@ -1,7 +1,7 @@
 package com.example.pdftm.service;
 
+import com.example.pdftm.domain.ChunkModel;
 import com.example.pdftm.domain.DocumentChunk;
-import com.example.pdftm.domain.ThingModel;
 import com.example.pdftm.dto.ChunkInspectView;
 import com.example.pdftm.dto.ChunkListItem;
 import com.example.pdftm.dto.DocumentOverview;
@@ -77,7 +77,7 @@ public class DocumentQueryService {
         DocumentChunk chunk = documentChunkMapper.selectById(chunkId);
         if (chunk == null) return null;
 
-        ThingModel current = thingModelMapper.findByChunkId(chunkId);
+        ChunkModel current = thingModelMapper.findByChunkId(chunkId);
 
         return ChunkInspectView.builder()
                 .chunk(chunk)

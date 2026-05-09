@@ -1,7 +1,7 @@
 package com.example.pdftm.dto;
 
+import com.example.pdftm.domain.ChunkModel;
 import com.example.pdftm.domain.DocumentChunk;
-import com.example.pdftm.domain.ThingModel;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.Builder;
 import lombok.Data;
@@ -22,5 +22,5 @@ public class ChunkContext {
     private DocumentChunk chunk;
 
     /** 当前生效物模型；未生成时为 null */
-    private ThingModel currentThingModel;
+    private ChunkModel currentThingModel;
 }

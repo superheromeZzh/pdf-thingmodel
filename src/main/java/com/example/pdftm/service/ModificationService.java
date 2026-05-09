@@ -1,6 +1,6 @@
 package com.example.pdftm.service;
 
-import com.example.pdftm.domain.ThingModel;
+import com.example.pdftm.domain.ChunkModel;
 import com.example.pdftm.mapper.ThingModelMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
@@ -26,10 +26,10 @@ public class ModificationService {
      *
      * @param chunkId 目标 chunk 主键
      * @param model   完整的新物模型 JSON
-     * @return 写入后的 ThingModel（chunkId + model）
+     * @return 写入后的 ChunkModel（chunkId + thingModel）
      */
     @Transactional(rollbackFor = Exception.class)
-    public ThingModel upsertModel(Long chunkId, JsonNode model) {
+    public ChunkModel upsertModel(Long chunkId, JsonNode model) {
         if (chunkId == null) throw new IllegalArgumentException("chunkId required");
         if (model == null)   throw new IllegalArgumentException("model required");
 
@@ -37,9 +37,9 @@ public class ModificationService {
         log.info("upsertModel: chunkId={} modelKeys={}", chunkId,
                 model.isObject() ? model.size() : -1);
 
-        ThingModel saved = new ThingModel();
+        ChunkModel saved = new ChunkModel();
         saved.setChunkId(chunkId);
-        saved.setModel(model);
+        saved.setThingModel(model);
         return saved;
     }
 }

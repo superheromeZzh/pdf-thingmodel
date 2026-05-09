@@ -1,7 +1,7 @@
 package com.example.pdftm.dto;
 
+import com.example.pdftm.domain.ChunkModel;
 import com.example.pdftm.domain.DocumentChunk;
-import com.example.pdftm.domain.ThingModel;
 import lombok.Builder;
 import lombok.Data;
 
@@ -10,7 +10,7 @@ import lombok.Data;
  *
  * 前端典型布局：
  *   左：chunk.rawText（原文）
- *   右：currentThingModel.model（解析后的物模型 JSON 或表单）
+ *   右：currentThingModel.thingModel（解析后的物模型 JSON 或表单）
  */
 @Data
 @Builder
@@ -20,5 +20,5 @@ public class ChunkInspectView {
     private DocumentChunk chunk;
 
     /** 当前生效物模型；未生成时为 null */
-    private ThingModel currentThingModel;
+    private ChunkModel currentThingModel;
 }
