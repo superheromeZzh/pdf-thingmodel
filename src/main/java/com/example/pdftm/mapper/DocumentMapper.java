@@ -1,7 +1,7 @@
 package com.example.pdftm.mapper;
 
-import com.example.pdftm.domain.Document;
-import com.example.pdftm.dto.DocumentOverview;
+import com.example.pdftm.entity.Document;
+import com.example.pdftm.vo.DocumentOverview;
 import org.apache.ibatis.annotations.Param;
 
 /**

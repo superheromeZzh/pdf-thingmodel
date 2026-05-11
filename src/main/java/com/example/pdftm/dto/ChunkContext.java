@@ -1,7 +1,7 @@
 package com.example.pdftm.dto;
 
-import com.example.pdftm.domain.ChunkModel;
-import com.example.pdftm.domain.DocumentChunk;
+import com.example.pdftm.entity.ChunkModel;
+import com.example.pdftm.entity.DocumentChunk;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.Builder;
 import lombok.Data;

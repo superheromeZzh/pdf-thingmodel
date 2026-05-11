@@ -1,6 +1,6 @@
 package com.example.pdftm.mapper;
 
-import com.example.pdftm.domain.ChunkModel;
+import com.example.pdftm.entity.ChunkModel;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.apache.ibatis.annotations.Param;
 

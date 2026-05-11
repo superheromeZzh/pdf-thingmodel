@@ -1,15 +1,15 @@
 package com.example.pdftm.service;
 
-import com.example.pdftm.domain.ChunkModel;
+import com.example.pdftm.entity.ChunkModel;
 import com.example.pdftm.dto.ChunkContext;
-import com.example.pdftm.dto.EditPreview;
+import com.example.pdftm.vo.EditPreview;
 import com.example.pdftm.dto.LlmEditOutput;
 import com.example.pdftm.dto.ModelDiff;
 import com.example.pdftm.dto.PromptMessages;
-import com.example.pdftm.llm.LlmCallOptions;
-import com.example.pdftm.llm.LlmClient;
-import com.example.pdftm.llm.LlmOutputInvalidException;
-import com.example.pdftm.llm.PatchInconsistentException;
+import com.example.pdftm.dto.LlmCallOptions;
+import com.example.pdftm.service.llm.LlmClient;
+import com.example.pdftm.common.exception.LlmOutputInvalidException;
+import com.example.pdftm.common.exception.PatchInconsistentException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flipkart.zjsonpatch.JsonPatch;

@@ -7,21 +7,21 @@
         skeleton_json (JSONB) 显式指定 JsonbTypeHandler；
         其它列依赖 mybatis 的下划线 → 驼峰自动映射（application.yml: map-underscore-to-camel-case=true）。
     -->
-    <resultMap id="DocumentResult" type="com.example.pdftm.domain.Document">
+    <resultMap id="DocumentResult" type="com.example.pdftm.entity.Document">
         <id     column="document_id"   property="documentId"/>
         <result column="document_name" property="documentName"/>
         <result column="page_count"    property="pageCount"/>
         <result column="skeleton_json" property="skeletonJson"
-                typeHandler="com.example.pdftm.handler.JsonbTypeHandler"/>
+                typeHandler="com.example.pdftm.common.handler.JsonbTypeHandler"/>
         <result column="created_at"    property="createdAt"/>
     </resultMap>
 
-    <resultMap id="DocumentOverviewResult" type="com.example.pdftm.dto.DocumentOverview">
+    <resultMap id="DocumentOverviewResult" type="com.example.pdftm.vo.DocumentOverview">
         <result column="document_id"   property="documentId"/>
         <result column="document_name" property="documentName"/>
         <result column="page_count"    property="pageCount"/>
         <result column="skeleton_json" property="skeletonJson"
-                typeHandler="com.example.pdftm.handler.JsonbTypeHandler"/>
+                typeHandler="com.example.pdftm.common.handler.JsonbTypeHandler"/>
         <result column="created_at"    property="createdAt"/>
         <result column="total_chunks"  property="totalChunks"/>
     </resultMap>
@@ -39,7 +39,7 @@
         VALUES (
             #{documentName},
             #{pageCount},
-            #{skeletonJson,jdbcType=OTHER,typeHandler=com.example.pdftm.handler.JsonbTypeHandler}
+            #{skeletonJson,jdbcType=OTHER,typeHandler=com.example.pdftm.common.handler.JsonbTypeHandler}
         )
     </insert>
 

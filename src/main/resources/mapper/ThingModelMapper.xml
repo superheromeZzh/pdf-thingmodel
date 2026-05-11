@@ -3,10 +3,10 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.example.pdftm.mapper.ThingModelMapper">
 
-    <resultMap id="ThingModelResult" type="com.example.pdftm.domain.ChunkModel">
+    <resultMap id="ThingModelResult" type="com.example.pdftm.entity.ChunkModel">
         <id     column="chunk_id"   property="chunkId"/>
         <result column="model"      property="thingModel"
-                typeHandler="com.example.pdftm.handler.JsonbTypeHandler"/>
+                typeHandler="com.example.pdftm.common.handler.JsonbTypeHandler"/>
         <result column="created_at" property="createdAt"/>
         <result column="updated_at" property="updatedAt"/>
     </resultMap>
@@ -23,7 +23,7 @@
         INSERT INTO thing_models (chunk_id, model)
         VALUES (
             #{chunkId},
-            #{model,jdbcType=OTHER,typeHandler=com.example.pdftm.handler.JsonbTypeHandler}
+            #{model,jdbcType=OTHER,typeHandler=com.example.pdftm.common.handler.JsonbTypeHandler}
         )
         ON CONFLICT (chunk_id) DO UPDATE SET model = EXCLUDED.model
     </insert>

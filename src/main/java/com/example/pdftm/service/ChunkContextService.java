@@ -1,8 +1,8 @@
 package com.example.pdftm.service;
 
-import com.example.pdftm.domain.ChunkModel;
-import com.example.pdftm.domain.Document;
-import com.example.pdftm.domain.DocumentChunk;
+import com.example.pdftm.entity.ChunkModel;
+import com.example.pdftm.entity.Document;
+import com.example.pdftm.entity.DocumentChunk;
 import com.example.pdftm.dto.ChunkContext;
 import com.example.pdftm.mapper.DocumentChunkMapper;
 import com.example.pdftm.mapper.DocumentMapper;

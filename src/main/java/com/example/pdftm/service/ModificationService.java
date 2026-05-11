@@ -1,6 +1,6 @@
 package com.example.pdftm.service;
 
-import com.example.pdftm.domain.ChunkModel;
+import com.example.pdftm.entity.ChunkModel;
 import com.example.pdftm.mapper.ThingModelMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;

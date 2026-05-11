@@ -1,10 +1,10 @@
 package com.example.pdftm.service;
 
-import com.example.pdftm.domain.ChunkModel;
-import com.example.pdftm.domain.DocumentChunk;
-import com.example.pdftm.dto.ChunkInspectView;
-import com.example.pdftm.dto.ChunkListItem;
-import com.example.pdftm.dto.DocumentOverview;
+import com.example.pdftm.entity.ChunkModel;
+import com.example.pdftm.entity.DocumentChunk;
+import com.example.pdftm.vo.ChunkInspectView;
+import com.example.pdftm.vo.ChunkListItem;
+import com.example.pdftm.vo.DocumentOverview;
 import com.example.pdftm.mapper.DocumentChunkMapper;
 import com.example.pdftm.mapper.DocumentMapper;
 import com.example.pdftm.mapper.ThingModelMapper;

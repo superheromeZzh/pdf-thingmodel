@@ -3,7 +3,7 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.example.pdftm.mapper.DocumentChunkMapper">
 
-    <resultMap id="DocumentChunkResult" type="com.example.pdftm.domain.DocumentChunk">
+    <resultMap id="DocumentChunkResult" type="com.example.pdftm.entity.DocumentChunk">
         <id     column="chunk_id"    property="chunkId"/>
         <result column="document_id" property="documentId"/>
         <result column="chunk_name"  property="chunkName"/>
@@ -14,7 +14,7 @@
         <result column="created_at"  property="createdAt"/>
     </resultMap>
 
-    <resultMap id="ChunkListItemResult" type="com.example.pdftm.dto.ChunkListItem">
+    <resultMap id="ChunkListItemResult" type="com.example.pdftm.vo.ChunkListItem">
         <result column="chunk_id"   property="chunkId"/>
         <result column="chunk_name" property="chunkName"/>
         <result column="page_start" property="pageStart"/>

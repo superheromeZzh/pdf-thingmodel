@@ -1,7 +1,7 @@
 package com.example.pdftm.mapper;
 
-import com.example.pdftm.domain.DocumentChunk;
-import com.example.pdftm.dto.ChunkListItem;
+import com.example.pdftm.entity.DocumentChunk;
+import com.example.pdftm.vo.ChunkListItem;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
