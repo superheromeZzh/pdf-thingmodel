@@ -1,7 +1,7 @@
 package com.example.pdftm.service;
 
 import com.example.pdftm.entity.ChunkModel;
-import com.example.pdftm.mapper.ThingModelMapper;
+import com.example.pdftm.mapper.ChunkModelMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ModificationService {
 
-    private final ThingModelMapper thingModelMapper;
+    private final ChunkModelMapper chunkModelMapper;
 
     /**
      * 写入或覆盖某 chunk 的物模型并返回最终生效对象。
@@ -33,7 +33,7 @@ public class ModificationService {
         if (chunkId == null) throw new IllegalArgumentException("chunkId required");
         if (model == null)   throw new IllegalArgumentException("model required");
 
-        thingModelMapper.upsert(chunkId, model);
+        chunkModelMapper.upsert(chunkId, model);
         log.info("upsertModel: chunkId={} modelKeys={}", chunkId,
                 model.isObject() ? model.size() : -1);
 

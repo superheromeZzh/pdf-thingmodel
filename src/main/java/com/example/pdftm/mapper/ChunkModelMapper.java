@@ -7,9 +7,9 @@ import org.apache.ibatis.annotations.Param;
 import java.util.List;
 
 /**
- * thing_models 表 mapper。SQL 全部在 src/main/resources/mapper/ThingModelMapper.xml。
+ * thing_models 表 mapper。SQL 全部在 src/main/resources/mapper/ChunkModelMapper.xml。
  */
-public interface ThingModelMapper {
+public interface ChunkModelMapper {
 
     /**
      * 按 chunkId 取当前生效物模型；每 chunk 至多一行（chunk_id 即主键）。

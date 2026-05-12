@@ -40,7 +40,7 @@ There is **no HTTP layer** yet: the project pulls `spring-boot-starter` (not `-w
 
 ### Single write path
 
-All writes to `thing_models` go through `ModificationService.upsertModel(chunkId, model)`, which calls `ThingModelMapper.upsert(...)` — a single `INSERT ... ON CONFLICT (chunk_id) DO UPDATE SET model = EXCLUDED.model`. There is **no optimistic locking**: concurrent writers are last-writer-wins. If a use case needs collaborative editing safety, add it at this seam (e.g., row-level lock or hash-of-current as a precondition).
+All writes to `thing_models` go through `ModificationService.upsertModel(chunkId, model)`, which calls `ChunkModelMapper.upsert(...)` — a single `INSERT ... ON CONFLICT (chunk_id) DO UPDATE SET model = EXCLUDED.model`. There is **no optimistic locking**: concurrent writers are last-writer-wins. If a use case needs collaborative editing safety, add it at this seam (e.g., row-level lock or hash-of-current as a precondition).
 
 ### LLM safety contract
 
@@ -82,9 +82,9 @@ When adding the LLM client, follow the contract in `LlmClient`'s javadoc: handle
   1. Globally registered via `mybatis.type-handlers-package=com.example.pdftm.handler` plus `@MappedTypes(JsonNode.class)` + `@MappedJdbcTypes(JdbcType.OTHER, includeNullJdbcType=true)` on the handler.
   2. Explicitly referenced in XML — every JSONB-bearing `<resultMap>` uses `<result column="..." property="..." typeHandler="com.example.pdftm.handler.JsonbTypeHandler"/>`, and every JSONB-writing `#{...}` uses `#{model,jdbcType=OTHER,typeHandler=com.example.pdftm.handler.JsonbTypeHandler}`.
 
-  Don't rely solely on the global registration — the explicit form is the convention here, because it makes JSONB columns obvious in the SQL. Each XML defines a reusable named `<resultMap>` (`DocumentResult`, `DocumentChunkResult`, `ThingModelResult`, `ChunkListItemResult`, `DocumentOverviewResult`) that all queries on that table reuse via `resultMap="..."`.
+  Don't rely solely on the global registration — the explicit form is the convention here, because it makes JSONB columns obvious in the SQL. Each XML defines a reusable named `<resultMap>` (`DocumentResult`, `DocumentChunkResult`, `ChunkModelResult`, `ChunkListItemResult`, `DocumentOverviewResult`) that all queries on that table reuse via `resultMap="..."`.
 - **`MapperScan`** in `PdfThingModelApplication` scans `com.example.pdftm.mapper`. New mappers go there as bare Java interfaces; all their SQL goes in a matching `src/main/resources/mapper/<MapperName>.xml` with `<mapper namespace="com.example.pdftm.mapper.MapperName">`. The `mybatis.mapper-locations: classpath*:mapper/**/*.xml` config in `application.yml` picks them up.
-- **PostgreSQL `@>` containment in XML.** Wrap any SQL containing `@>` in `<![CDATA[ ... ]]>` (see `findContainingFragment` in `ThingModelMapper.xml`) — XML element content treats `<` as markup, and CDATA also makes it visually obvious that the block is "raw SQL, hands off."
+- **PostgreSQL `@>` containment in XML.** Wrap any SQL containing `@>` in `<![CDATA[ ... ]]>` (see `findContainingFragment` in `ChunkModelMapper.xml`) — XML element content treats `<` as markup, and CDATA also makes it visually obvious that the block is "raw SQL, hands off."
 - **No `BaseMapper`-style inheritance.** Each mapper declares only the methods it actually needs. If you need `selectById` somewhere new, write it explicitly — see the existing `selectById` in each mapper.
 - **`ModelDiff` rawPatch uses `OMIT_MOVE_OPERATION + OMIT_COPY_OPERATION`** so diffs only contain add/remove/replace. This is intentional — the frontend renderer expects three change kinds (`added` / `removed` / `modified`). Don't widen.
 - **Comments and doc strings in this codebase are in Chinese.** Match the existing style when editing — don't translate existing comments to English.

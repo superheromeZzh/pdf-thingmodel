@@ -7,7 +7,7 @@ import com.example.pdftm.vo.ChunkListItem;
 import com.example.pdftm.vo.DocumentOverview;
 import com.example.pdftm.mapper.DocumentChunkMapper;
 import com.example.pdftm.mapper.DocumentMapper;
-import com.example.pdftm.mapper.ThingModelMapper;
+import com.example.pdftm.mapper.ChunkModelMapper;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -32,7 +32,7 @@ public class DocumentQueryService {
 
     private final DocumentMapper documentMapper;
     private final DocumentChunkMapper documentChunkMapper;
-    private final ThingModelMapper thingModelMapper;
+    private final ChunkModelMapper chunkModelMapper;
 
     /**
      * 查询文档首页卡片所需的概览数据。
@@ -77,7 +77,7 @@ public class DocumentQueryService {
         DocumentChunk chunk = documentChunkMapper.selectById(chunkId);
         if (chunk == null) return null;
 
-        ChunkModel current = thingModelMapper.findByChunkId(chunkId);
+        ChunkModel current = chunkModelMapper.findByChunkId(chunkId);
 
         return ChunkInspectView.builder()
                 .chunk(chunk)

@@ -6,7 +6,7 @@ import com.example.pdftm.entity.DocumentChunk;
 import com.example.pdftm.dto.ChunkContext;
 import com.example.pdftm.mapper.DocumentChunkMapper;
 import com.example.pdftm.mapper.DocumentMapper;
-import com.example.pdftm.mapper.ThingModelMapper;
+import com.example.pdftm.mapper.ChunkModelMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -23,7 +23,7 @@ public class ChunkContextService {
 
     private final DocumentMapper documentMapper;
     private final DocumentChunkMapper documentChunkMapper;
-    private final ThingModelMapper thingModelMapper;
+    private final ChunkModelMapper chunkModelMapper;
 
     /**
      * 加载指定 chunk 的"喂给 LLM 的一次性上下文"：骨架 + chunk + 当前物模型。
@@ -40,7 +40,7 @@ public class ChunkContextService {
         if (doc == null) {
             throw new IllegalArgumentException("document not found: " + chunk.getDocumentId());
         }
-        ChunkModel current = thingModelMapper.findByChunkId(chunkId);
+        ChunkModel current = chunkModelMapper.findByChunkId(chunkId);
 
         return ChunkContext.builder()
                 .skeleton(doc.getSkeletonJson())

@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.example.pdftm.mapper.ThingModelMapper">
+<mapper namespace="com.example.pdftm.mapper.ChunkModelMapper">
 
-    <resultMap id="ThingModelResult" type="com.example.pdftm.entity.ChunkModel">
+    <resultMap id="ChunkModelResult" type="com.example.pdftm.entity.ChunkModel">
         <id     column="chunk_id"   property="chunkId"/>
         <result column="model"      property="thingModel"
                 typeHandler="com.example.pdftm.common.handler.JsonbTypeHandler"/>
@@ -11,7 +11,7 @@
         <result column="updated_at" property="updatedAt"/>
     </resultMap>
 
-    <select id="findByChunkId" resultMap="ThingModelResult">
+    <select id="findByChunkId" resultMap="ChunkModelResult">
         SELECT * FROM thing_models WHERE chunk_id = #{chunkId} LIMIT 1
     </select>
 
@@ -32,7 +32,7 @@
         跨 chunk 反查："找出所有当前物模型里包含某 JSON 片段的"。
         @> 是 PostgreSQL/openGauss 的 jsonb 包含运算符；用 CDATA 避免和 XML 解析冲突。
     -->
-    <select id="findContainingFragment" resultMap="ThingModelResult">
+    <select id="findContainingFragment" resultMap="ChunkModelResult">
         <![CDATA[
         SELECT tm.* FROM thing_models tm
         JOIN document_chunks c ON c.chunk_id = tm.chunk_id
