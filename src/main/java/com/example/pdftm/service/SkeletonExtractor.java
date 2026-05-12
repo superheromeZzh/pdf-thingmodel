@@ -220,35 +220,38 @@ public class SkeletonExtractor {
 
     /** 单条 detectedChunk → DetectedChunk；必填缺失返回空，页码越界则钳到合法闭区间 */
     private Optional<DetectedChunk> toDetectedChunk(JsonNode node, int totalPages) {
-        String  name = textOr(node, "chunkName", null);
-        Integer ps   = intOr (node, "pageStart", null);
-        Integer pe   = intOr (node, "pageEnd",   null);
-        if (name == null || name.isBlank() || ps == null || pe == null) {
+        String  chunkName = readText(node, "chunkName");
+        Integer pageStart = readInt (node, "pageStart");
+        Integer pageEnd   = readInt (node, "pageEnd");
+        if (chunkName == null || chunkName.isBlank() || pageStart == null || pageEnd == null) {
             log.warn("跳过非法 detectedChunk: {}", node);
             return Optional.empty();
         }
-        int safeStart = clamp(ps, 1,         totalPages);
-        int safeEnd   = clamp(pe, safeStart, totalPages);
-        return Optional.of(new DetectedChunk(name.trim(), safeStart, safeEnd, textOr(node, "summary", null)));
+        int safeStart = clamp(pageStart, 1,         totalPages);
+        int safeEnd   = clamp(pageEnd,   safeStart, totalPages);
+        return Optional.of(new DetectedChunk(chunkName.trim(), safeStart, safeEnd, readText(node, "summary")));
     }
 
-    private static int clamp(int v, int lo, int hi) {
-        return Math.max(lo, Math.min(v, hi));
+    private static int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(value, max));
     }
 
-    private static String textOr(JsonNode n, String field, String dflt) {
-        JsonNode v = (n == null) ? null : n.get(field);
-        return (v == null || v.isNull()) ? dflt : v.asText(dflt);
+    /** 取文本字段；字段缺失、JSON null、或值是数组/对象等非文本类型时返回 null */
+    private static String readText(JsonNode node, String field) {
+        JsonNode value = (node == null) ? null : node.get(field);
+        if (value == null || value.isNull()) return null;
+        return value.asText(null);                 // 容器类型 → null（Jackson 语义）
     }
 
-    private static Integer intOr(JsonNode n, String field, Integer dflt) {
-        JsonNode v = (n == null) ? null : n.get(field);
-        if (v == null || v.isNull()) return dflt;
-        if (v.isInt() || v.isLong()) return v.asInt();
+    /** 取整数字段；兼容字符串数字（如 "5"）；非法或缺失时返回 null */
+    private static Integer readInt(JsonNode node, String field) {
+        JsonNode value = (node == null) ? null : node.get(field);
+        if (value == null || value.isNull()) return null;
+        if (value.isInt() || value.isLong()) return value.asInt();
         try {
-            return Integer.parseInt(v.asText().trim());
-        } catch (Exception e) {
-            return dflt;
+            return Integer.parseInt(value.asText().trim());
+        } catch (NumberFormatException e) {
+            return null;
         }
     }
 }
