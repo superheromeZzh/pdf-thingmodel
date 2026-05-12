@@ -119,7 +119,7 @@ public class LlmEditService {
                         .attempts(attempt)
                         .build();
 
-            } catch (LlmOutputInvalidException | PatchInconsistentException e) {
+            } catch (LlmOutputInvalidException e) {
                 lastError = e;
                 log.warn("attempt {}/{}: {} (raw len={})", attempt, MAX_ATTEMPTS,
                         e.getMessage(), raw == null ? 0 : raw.length());

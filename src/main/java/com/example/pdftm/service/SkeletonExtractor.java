@@ -8,6 +8,7 @@ import com.example.pdftm.dto.Bookmark;
 import com.example.pdftm.dto.Extracted;
 import com.example.pdftm.dto.LlmCallOptions;
 import com.example.pdftm.service.llm.LlmClient;
+import com.example.pdftm.common.error.ErrorCode;
 import com.example.pdftm.common.exception.LlmOutputInvalidException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,9 +18,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
+import java.util.stream.StreamSupport;
 
 /**
  * 阶段 1：便宜 LLM 一次性产出文档骨架 + 检测到的 chunk 清单。
@@ -164,53 +167,73 @@ public class SkeletonExtractor {
 
     // ----------------------------------------------------------- response 解析
 
+    /**
+     * 解析骨架抽取响应。整体走"宽进严出"：
+     * 顶层结构必须完整（否则抛 {@link LlmOutputInvalidException} 触发重试），
+     * 单条 detectedChunk 字段缺失/越界则降级（log + skip 或钳位），不阻断整体。
+     */
     ExtractedSkeleton parseOutput(String raw, int totalPages) {
-        if (raw == null || raw.isBlank()) {
-            throw new LlmOutputInvalidException("empty LLM response");
-        }
-        String stripped = JSON_FENCE.matcher(raw).replaceAll("$1").trim();
+        JsonNode root      = parseJson(raw);
+        JsonNode skeleton  = requireField(root, "skeleton",       JsonNode::isObject, "object");
+        JsonNode chunksArr = requireField(root, "detectedChunks", JsonNode::isArray,  "array");
 
-        JsonNode root;
-        try {
-            root = MAPPER.readTree(stripped);
-        } catch (Exception e) {
-            throw new LlmOutputInvalidException("骨架抽取响应不是合法 JSON: " + e.getMessage(), e);
-        }
+        List<DetectedChunk> chunks = StreamSupport.stream(chunksArr.spliterator(), false)
+                .map(node -> toDetectedChunk(node, totalPages))
+                .flatMap(Optional::stream)
+                .toList();
 
-        JsonNode skeleton = root.get("skeleton");
-        if (skeleton == null || !skeleton.isObject()) {
-            throw new LlmOutputInvalidException("骨架抽取响应缺 'skeleton' 对象字段");
-        }
-        JsonNode chunksNode = root.get("detectedChunks");
-        if (chunksNode == null || !chunksNode.isArray() || chunksNode.isEmpty()) {
-            throw new LlmOutputInvalidException("骨架抽取响应缺 'detectedChunks' 数组（或为空）");
-        }
-
-        List<DetectedChunk> chunks = new ArrayList<>();
-        for (JsonNode c : chunksNode) {
-            String name = textOr(c, "chunkName", null);
-            Integer ps = intOr(c, "pageStart", null);
-            Integer pe = intOr(c, "pageEnd", null);
-            String summary = textOr(c, "summary", null);
-            if (name == null || name.isBlank() || ps == null || pe == null) {
-                log.warn("跳过非法 detectedChunk: {}", c.toString());
-                continue;
-            }
-            // 钳到合法页码范围；闭区间 + 顺序
-            int safeStart = Math.max(1, Math.min(ps, totalPages));
-            int safeEnd   = Math.max(safeStart, Math.min(pe, totalPages));
-            chunks.add(new DetectedChunk(name.trim(), safeStart, safeEnd, summary));
-        }
         if (chunks.isEmpty()) {
-            throw new LlmOutputInvalidException("detectedChunks 全部非法/被过滤");
+            throw new LlmOutputInvalidException(ErrorCode.SKELETON_DETECTED_CHUNKS_EMPTY);
         }
 
-        // skeletonJson 强制是对象，避免后续 PromptBuilder.skeleton.get("outline") 之类炸 NPE
-        ObjectNode skeletonObj = skeleton.deepCopy();
+        // 强制 ObjectNode 副本：下游 PromptBuilder 会 .get("outline") 等，避免共享引用 + 类型保证
         return ExtractedSkeleton.builder()
-                .skeletonJson(skeletonObj)
+                .skeletonJson((ObjectNode) skeleton.deepCopy())
                 .detectedChunks(chunks)
                 .build();
+    }
+
+    /** 剥围栏 → 解析为 JsonNode；失败抛带错误码的异常 */
+    private static JsonNode parseJson(String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw new LlmOutputInvalidException(ErrorCode.LLM_RESPONSE_EMPTY);
+        }
+        String stripped = JSON_FENCE.matcher(raw).replaceAll("$1").trim();
+        try {
+            return MAPPER.readTree(stripped);
+        } catch (Exception e) {
+            throw new LlmOutputInvalidException(ErrorCode.LLM_RESPONSE_NOT_JSON, e, e.getMessage());
+        }
+    }
+
+    /** 取顶层字段并按类型谓词校验；不存在或类型错抛带错误码的异常 */
+    private static JsonNode requireField(JsonNode root,
+                                         String field,
+                                         Predicate<JsonNode> typeCheck,
+                                         String expectedType) {
+        JsonNode node = root.get(field);
+        if (node == null || !typeCheck.test(node)) {
+            throw new LlmOutputInvalidException(ErrorCode.SKELETON_FIELD_INVALID, field, expectedType);
+        }
+        return node;
+    }
+
+    /** 单条 detectedChunk → DetectedChunk；必填缺失返回空，页码越界则钳到合法闭区间 */
+    private Optional<DetectedChunk> toDetectedChunk(JsonNode node, int totalPages) {
+        String  name = textOr(node, "chunkName", null);
+        Integer ps   = intOr (node, "pageStart", null);
+        Integer pe   = intOr (node, "pageEnd",   null);
+        if (name == null || name.isBlank() || ps == null || pe == null) {
+            log.warn("跳过非法 detectedChunk: {}", node);
+            return Optional.empty();
+        }
+        int safeStart = clamp(ps, 1,         totalPages);
+        int safeEnd   = clamp(pe, safeStart, totalPages);
+        return Optional.of(new DetectedChunk(name.trim(), safeStart, safeEnd, textOr(node, "summary", null)));
+    }
+
+    private static int clamp(int v, int lo, int hi) {
+        return Math.max(lo, Math.min(v, hi));
     }
 
     private static String textOr(JsonNode n, String field, String dflt) {
