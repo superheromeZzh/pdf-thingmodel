@@ -4,15 +4,14 @@
 <mapper namespace="com.example.pdftm.mapper.DocumentMapper">
 
     <!--
-        skeleton_json (JSONB) 显式指定 JsonbTypeHandler；
-        其它列依赖 mybatis 的下划线 → 驼峰自动映射（application.yml: map-underscore-to-camel-case=true）。
+        所有列依赖 mybatis 的下划线 → 驼峰自动映射（application.yml: map-underscore-to-camel-case=true）。
+        无 JSONB 列，不需要 typeHandler。
     -->
     <resultMap id="DocumentResult" type="com.example.pdftm.entity.Document">
         <id     column="document_id"   property="documentId"/>
         <result column="document_name" property="documentName"/>
         <result column="page_count"    property="pageCount"/>
-        <result column="skeleton_json" property="skeletonJson"
-                typeHandler="com.example.pdftm.common.handler.JsonbTypeHandler"/>
+        <result column="summary"       property="summary"/>
         <result column="created_at"    property="createdAt"/>
     </resultMap>
 
@@ -20,8 +19,7 @@
         <result column="document_id"   property="documentId"/>
         <result column="document_name" property="documentName"/>
         <result column="page_count"    property="pageCount"/>
-        <result column="skeleton_json" property="skeletonJson"
-                typeHandler="com.example.pdftm.common.handler.JsonbTypeHandler"/>
+        <result column="summary"       property="summary"/>
         <result column="created_at"    property="createdAt"/>
         <result column="total_chunks"  property="totalChunks"/>
     </resultMap>
@@ -30,17 +28,10 @@
         SELECT * FROM documents WHERE document_id = #{documentId} LIMIT 1
     </select>
 
-    <!--
-        Stage 0/1 ingestion 写入。useGeneratedKeys 让 BIGSERIAL 回填到 documentId。
-        skeleton_json 显式声明 typeHandler，避免 jsonb 列被当字符串塞。
-    -->
+    <!-- Stage 0/1 ingestion 写入。useGeneratedKeys 让 BIGSERIAL 回填到 documentId。 -->
     <insert id="insert" useGeneratedKeys="true" keyProperty="documentId" keyColumn="document_id">
-        INSERT INTO documents (document_name, page_count, skeleton_json)
-        VALUES (
-            #{documentName},
-            #{pageCount},
-            #{skeletonJson,jdbcType=OTHER,typeHandler=com.example.pdftm.common.handler.JsonbTypeHandler}
-        )
+        INSERT INTO documents (document_name, page_count, summary)
+        VALUES (#{documentName}, #{pageCount}, #{summary})
     </insert>
 
     <select id="findOverview" resultMap="DocumentOverviewResult">
@@ -48,13 +39,13 @@
             d.document_id,
             d.document_name,
             d.page_count,
-            d.skeleton_json,
+            d.summary,
             d.created_at,
             COUNT(c.chunk_id) AS total_chunks
         FROM documents d
         LEFT JOIN document_chunks c ON c.document_id = d.document_id
         WHERE d.document_id = #{documentId}
-        GROUP BY d.document_id, d.document_name, d.page_count, d.skeleton_json, d.created_at
+        GROUP BY d.document_id, d.document_name, d.page_count, d.summary, d.created_at
     </select>
 
 </mapper>

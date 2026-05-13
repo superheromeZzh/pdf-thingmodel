@@ -32,18 +32,18 @@ There is **no HTTP layer** yet: the project pulls `spring-boot-starter` (not `-w
 
 | Table | Columns |
 |---|---|
-| `documents` | `document_id`, `document_name`, `page_count`, `skeleton_json` (JSONB) |
+| `documents` | `document_id`, `document_name`, `page_count`, `summary` (TEXT) |
 | `document_chunks` | `chunk_id`, `document_id`, `chunk_name`, `page_start`, `page_end`, `raw_text`, `summary` |
 | `thing_models` | `chunk_id` (PK = FK), `model` (JSONB) |
 
 `thing_models.chunk_id` is both primary key and foreign key — **one model per chunk, no history**. Don't reintroduce `version` / `is_current` / `derived_from` / `patch` / `change_type` / `created_by` columns, or a separate `modifications` table; the deliberate trade-off here is "last-writer-wins" with the audit trail dropped.
 
-**`skeleton_json` 极简形态：当前只有 `{ "abstract": "<150-300 字文档摘要>" }`** —— 一段叙述性文字给编辑期当文档语境，再无其它字段。两类东西都**不进 skeleton**：
+**`documents.summary` 是 TEXT 而非 JSONB** —— 一段 150-300 字的文档级摘要，给编辑期/解析期当文档语境，没有其它字段也没有 JSON 结构。注意 `document_chunks.summary` 也叫 summary 但作用域不同：那是 chunk 级一句话摘要，前者是文档级一段话摘要。两类东西都**不存进 documents**：
 
-1. **对 chunk 内容的索引**（章节树、API 列表、公共 schema 索引）。skeleton 写一次读 N 次但没有刷新机制，索引类信息放进来会随 chunk 编辑坍塌。需要时按需查 `document_chunks` / `thing_models`。所以不要把 `outline / sharedSchemas / apiIndex` 加回 schema。
-2. **规则性字段**（`conventions`、`scope.excludes`、`glossary` 等）。这些会让 LLM 在抽取时瞎填规则，再被下游编辑当真。真正的全局规则（默认单位 SI、命名 camelCase、时间戳 ISO-8601、响应格式 JSON、错误码 string）写在 `PromptBuilder.buildSystemPrompt` 工作规则 3 里——跨文档的固定默认，不该让 LLM 每个文档识别一次。`documentMeta`（产品/版本/出版方）也是同理：anchor 行价值不大（每次编辑本来就只看一本书），不做版本管理就更没必要。所以不要把这些加回 schema。
+1. **对 chunk 内容的索引**（章节树、API 列表、公共 schema 索引）。这类数据写一次读 N 次但没有刷新机制，会随 chunk 编辑坍塌。需要时按需查 `document_chunks` / `thing_models`。所以不要把 `outline / sharedSchemas / apiIndex` 加回来。
+2. **规则性字段**（`conventions`、`scope.excludes`、`glossary` 等）。这些会让 LLM 在抽取时瞎填规则，再被下游编辑当真。真正的全局规则（默认单位 SI、命名 camelCase、时间戳 ISO-8601、响应格式 JSON、错误码 string）写在 `PromptBuilder.buildSystemPrompt` 工作规则里——跨文档的固定默认，不该让 LLM 每个文档识别一次。`documentMeta`（产品/版本/出版方）也是同理：anchor 行价值不大（每次编辑本来就只看一本书），不做版本管理就更没必要。
 
-`detectedChunks` 的 `pageEnd` 由 LLM 直接给出"下一个 chunk 的 pageStart"（最后一个 = 总页数），**不做后处理**。这是为了用最简单的契约换一次实测——准确度不够再加 stitch 逻辑或代码后处理。
+`SkeletonExtractor` 的 LLM 输出是顶层扁平 `{ "summary": "...", "detectedChunks": [{..., "summary": "..."}] }`——同样有两层 summary，prompt 里用 `【文档级】`/`【chunk 级】` 占位符明确区分。`detectedChunks` 的 `pageEnd` 由 LLM 给：相邻 chunk 在边界页重叠（chunks[i].pageEnd = chunks[i+1].pageStart），**最后一个 chunk 不默认延伸到总页数**，由 LLM 根据尾部正文判断实际结束页——文档末尾常有附录/索引/版权页等无关内容，强行延伸会把它们污染进最后一个 chunk 的 raw_text。准确度不够再考虑后处理或 raw_text 抽取层切割。
 
 ### Single write path
 
@@ -61,7 +61,7 @@ Failure → up to `MAX_ATTEMPTS = 3` retries with the error message appended to 
 
 ### Skeleton travels in every prompt
 
-`documents.skeleton_json` (~0.3KB, ~300–500 tokens — just one abstract paragraph) is sent **on every single-chunk edit**. `PromptBuilder.buildEditPrompt` lays out the prompt in fixed order: document background (abstract) → chunk meta → JSON schema → current model → raw text → user request. Total prompt size is ~4K–8K tokens, **independent of PDF length** — that's the whole point of the chunk-plus-skeleton design. Don't change the section order without also updating the LLM expectations in the system prompt.
+`documents.summary` (~0.3KB, ~300–500 tokens — one paragraph) is sent **on every single-chunk edit**. `PromptBuilder.buildEditPrompt` lays out the prompt in fixed order: document background (summary) → chunk meta → JSON schema → current model → raw text → user request. Total prompt size is ~4K–8K tokens, **independent of PDF length** — that's the whole point of the chunk-plus-summary design. Don't change the section order without also updating the LLM expectations in the system prompt.
 
 (There used to be a "recent variations history" section sourced from past `thing_models` versions; with versioning gone, that section is removed.)
 

@@ -12,7 +12,6 @@ import com.example.pdftm.common.error.ErrorCode;
 import com.example.pdftm.common.exception.LlmOutputInvalidException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,22 +31,26 @@ import java.util.stream.StreamSupport;
  *   - 头 5 页 + 尾 5 页正文（context 节流）
  *   - 整本书签（PDFBox 抽取得到，是定位 chunk 边界的主要依据）
  *
- * 输出严格 JSON：
+ * 输出严格 JSON（顶层扁平）：
  * <pre>
  * {
- *   "skeleton": { "abstract": "<一段 150-300 字的文档摘要>" },
+ *   "summary": "<一段 150-300 字的文档级摘要>",
  *   "detectedChunks": [ { chunkName, pageStart, pageEnd, summary } ]
  * }
  * </pre>
  *
- * 设计取舍：skeleton 只留一段叙述性 abstract 作为编辑期的文档语境。
+ * 注意 summary 出现在两层：顶层是文档级（一段话），detectedChunks 内是 chunk 级（一句话），
+ * 占位文案已明确区分。
+ *
+ * 设计取舍：只留一段叙述性 summary 作为编辑期的文档语境。
  * 任何"规则性"字段（conventions / scope.excludes / glossary）和
- * "对 chunk 内容的索引"（outline / sharedSchemas / apiIndex）都不进
- * skeleton——前者会让 LLM 在抽取时瞎填规则，后者会随 chunk 编辑坍塌。
+ * "对 chunk 内容的索引"（outline / sharedSchemas / apiIndex）都不抽——
+ * 前者会让 LLM 在抽取时瞎填规则，后者会随 chunk 编辑坍塌。
  * 真正的全局规则写在 PromptBuilder.buildSystemPrompt 里。
  *
- * pageEnd 由 LLM 直接给出"下一个 chunk 的 pageStart"（最后一个 = 总页数），
- * 不做后处理；目的是用最简单的契约换一次实测，看准确度是否够用。
+ * pageEnd 规则：相邻 chunk 在边界页重叠（chunks[i].pageEnd = chunks[i+1].pageStart）；
+ * 最后一个 chunk 由 LLM 根据尾部正文判断实际结束页——不要默认延伸到总页数，
+ * 因为文档末尾常有附录/索引/版权页等与最后一个 chunk 无关的内容。
  */
 @Slf4j
 @Service
@@ -90,9 +93,9 @@ public class SkeletonExtractor {
 
         String raw = llmClient.generate(prompt, opts);
         ExtractedSkeleton out = parseOutput(raw, doc.getPageCount());
-        log.info("skeleton extracted: detectedChunks={} skeletonKeys={}",
+        log.info("skeleton extracted: detectedChunks={} summaryChars={}",
                 out.getDetectedChunks().size(),
-                out.getSkeletonJson() != null ? out.getSkeletonJson().size() : 0);
+                out.getSummary() == null ? 0 : out.getSummary().length());
         return out;
     }
 
@@ -103,23 +106,25 @@ public class SkeletonExtractor {
                 你是文档骨架抽取助手。读完用户提供的"文件名 + 头尾正文 + 整本书签"，
                 按下面 schema 输出严格 JSON（不要 markdown 围栏，不要前后多余文本）。
 
-                # 输出 schema
+                # 输出 schema（顶层扁平，无 skeleton 包装）
                 {
-                  "skeleton": {
-                    "abstract": "<一段 150-300 字的文档摘要：覆盖范围、面向的产品/版本、关键内容>"
-                  },
+                  "summary": "<【文档级】一段 150-300 字摘要：覆盖范围、面向的产品/版本、关键内容>",
                   "detectedChunks": [
-                    { "chunkName":"<API 名或章节标题>", "pageStart":1, "pageEnd":3, "summary":"<一句话>" }
+                    { "chunkName":"<API 名或章节标题>", "pageStart":1, "pageEnd":3, "summary":"<【chunk 级】一句话摘要>" }
                   ]
                 }
 
                 # 工作规则
                 1. detectedChunks 是后续单 chunk 物模型解析的目标；优先以书签为权威边界，
-                   书签缺失时再从首尾页正文推断。
+                   书签缺失时再从首尾页正文推断。文档末尾若有附录/索引/版权页/空白页等
+                   与 API 或章节内容无关的部分，**不要为它们生成 chunk**。
                 2. detectedChunks 按 pageStart 升序排列，1-based。
-                3. pageEnd 规则：每个 chunk 的 pageEnd **必须等于下一个 chunk 的 pageStart**
-                   （即两个相邻 chunk 在边界页上重叠 1 页，避免漏掉跨页内容）；
-                   最后一个 chunk 的 pageEnd 等于"总页数"。
+                3. pageEnd 规则：
+                   - 非最后一个 chunk：pageEnd **必须等于下一个 chunk 的 pageStart**
+                     （相邻 chunk 在边界页重叠 1 页，避免漏掉跨页内容）。
+                   - 最后一个 chunk：根据"尾部正文片段"判断该 chunk 内容实际结束在哪一页，
+                     pageEnd 设为该实际结束页。**不要默认设成总页数**——若尾部明显是
+                     附录/索引/版权等不属于该 chunk 的内容，pageEnd 应止于内容真正结束的位置。
                 4. chunkName 必须在本文档内唯一（重名会被数据库 UNIQUE 约束拒绝）。
                 5. 没有把握的字段宁可留空字符串/空数组，不要编造。
                 6. 输出必须是合法 JSON，可以被 JSON.parse 直接解析。
@@ -161,8 +166,16 @@ public class SkeletonExtractor {
      */
     ExtractedSkeleton parseOutput(String raw, int totalPages) {
         JsonNode root      = parseJson(raw);
-        JsonNode skeleton  = requireField(root, "skeleton",       JsonNode::isObject, "object");
         JsonNode chunksArr = requireField(root, "detectedChunks", JsonNode::isArray,  "array");
+
+        // 顶层 summary 可选：缺失/类型错时回退为空串，记一行 warn 即可，不阻断 ingestion
+        String docSummary = "";
+        JsonNode summaryNode = root.get("summary");
+        if (summaryNode != null && summaryNode.isTextual()) {
+            docSummary = summaryNode.asText();
+        } else if (summaryNode != null) {
+            log.warn("文档级 summary 类型异常（非字符串），按空串处理: {}", summaryNode.getNodeType());
+        }
 
         List<DetectedChunk> chunks = StreamSupport.stream(chunksArr.spliterator(), false)
                 .map(node -> toDetectedChunk(node, totalPages))
@@ -173,9 +186,8 @@ public class SkeletonExtractor {
             throw new LlmOutputInvalidException(ErrorCode.SKELETON_DETECTED_CHUNKS_EMPTY);
         }
 
-        // 强制 ObjectNode 副本：下游 PromptBuilder 会 .get("outline") 等，避免共享引用 + 类型保证
         return ExtractedSkeleton.builder()
-                .skeletonJson((ObjectNode) skeleton.deepCopy())
+                .summary(docSummary)
                 .detectedChunks(chunks)
                 .build();
     }

@@ -49,7 +49,7 @@ public class ChunkParseService {
 
     /**
      * 按 chunkId 触发物模型解析：从库里捞 chunk + 所属文档骨架，再走
-     * {@link #parseAndSave(JsonNode, DocumentChunk)}。upsert 语义，已存在的物模型会被覆盖。
+     * {@link #parseAndSave(String, DocumentChunk)}。upsert 语义，已存在的物模型会被覆盖。
      *
      * @param chunkId 已经入库的 chunk 主键
      * @return 解析后的物模型 JSON
@@ -66,17 +66,17 @@ public class ChunkParseService {
             throw new NoSuchElementException(
                     "document not found for chunk " + chunkId + ": documentId=" + chunk.getDocumentId());
         }
-        return parseAndSave(doc.getSkeletonJson(), chunk);
+        return parseAndSave(doc.getSummary(), chunk);
     }
 
     /**
      * 调用强 LLM 解析单个 chunk 的物模型并 upsert 到 thing_models。
      *
-     * @param skeletonJson 文档全局骨架
-     * @param chunk        当前 chunk（含 chunkId / rawText）
+     * @param documentSummary 文档级摘要（作为背景语境拼进 prompt）
+     * @param chunk           当前 chunk（含 chunkId / rawText）
      * @return 解析后的物模型 JSON；连续 {@link #MAX_ATTEMPTS} 次失败抛 {@link LlmOutputInvalidException}
      */
-    public JsonNode parseAndSave(JsonNode skeletonJson, DocumentChunk chunk) {
+    public JsonNode parseAndSave(String documentSummary, DocumentChunk chunk) {
         if (chunk == null || chunk.getChunkId() == null) {
             throw new IllegalArgumentException("chunk with chunkId required");
         }
@@ -92,7 +92,7 @@ public class ChunkParseService {
         Throwable lastError = null;
 
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-            PromptMessages prompt = buildPrompt(skeletonJson, chunk, cumulativeFeedback.toString());
+            PromptMessages prompt = buildPrompt(documentSummary, chunk, cumulativeFeedback.toString());
             String raw;
             try {
                 raw = llmClient.generate(prompt, opts);
@@ -129,7 +129,7 @@ public class ChunkParseService {
 
     // ----------------------------------------------------------- prompt 拼装
 
-    private PromptMessages buildPrompt(JsonNode skeleton, DocumentChunk chunk, String feedback) {
+    private PromptMessages buildPrompt(String documentSummary, DocumentChunk chunk, String feedback) {
         String system = """
                 你是物模型抽取助手。读完用户提供的"文档背景 + 当前 chunk 原文"，
                 输出该 chunk 对应的"物模型 JSON"。
@@ -140,25 +140,19 @@ public class ChunkParseService {
                   "summary": "<可选：一句话物模型概述>"
                 }
 
-                # 工作规则
-                1. 字段命名遵循文档"全局约定"（如有）；默认 camelCase。
-                2. 单位优先 SI；时间默认秒、温度默认摄氏；除非原文明确指定。
-                3. 字段约束（min/max/default/enum 等）必须在原文里有依据；找不到依据宁可留空。
-                4. model 必须是对象；输出整体必须是合法 JSON。
+                # 工作规则（默认约定，除非原文明确指定其它）
+                1. 命名：camelCase。
+                2. 单位：SI；时间秒，温度摄氏。
+                3. 时间戳：ISO-8601。响应格式：JSON。错误码：string。
+                4. 字段约束（min/max/default/enum 等）必须在原文里有依据；找不到依据宁可留空。
+                5. model 必须是对象；输出整体必须是合法 JSON。
                 """;
 
         StringBuilder user = new StringBuilder(8 * 1024);
 
         user.append("# 文档背景\n");
-        appendBackground(user, skeleton);
-
-        user.append("\n# 全局约定\n");
-        JsonNode conv = (skeleton == null) ? null : skeleton.get("conventions");
-        if (conv != null && !conv.isEmpty()) {
-            user.append(conv.toPrettyString()).append('\n');
-        } else {
-            user.append("(无)\n");
-        }
+        user.append((documentSummary == null || documentSummary.isBlank())
+                ? "(无背景描述)" : documentSummary).append('\n');
 
         user.append("\n# 当前 chunk\n");
         user.append("- 名称: ").append(safe(chunk.getChunkName())).append('\n');
@@ -192,29 +186,6 @@ public class ChunkParseService {
                 .build();
     }
 
-    private void appendBackground(StringBuilder sb, JsonNode skeleton) {
-        if (skeleton == null) {
-            sb.append("(无骨架信息)\n");
-            return;
-        }
-        JsonNode meta = skeleton.get("documentMeta");
-        if (meta != null && !meta.isEmpty()) {
-            String product = textOr(meta, "product");
-            String version = textOr(meta, "version");
-            String docType = textOr(meta, "docType");
-            if (!product.isEmpty() || !version.isEmpty() || !docType.isEmpty()) {
-                sb.append("- ");
-                if (!product.isEmpty()) sb.append(product);
-                if (!version.isEmpty()) sb.append(' ').append(version);
-                if (!docType.isEmpty()) sb.append("（").append(docType).append("）");
-                sb.append('\n');
-            }
-        }
-        JsonNode summary = skeleton.get("summary");
-        String abs = (summary == null) ? "" : textOr(summary, "abstract");
-        if (!abs.isEmpty()) sb.append(abs).append('\n');
-    }
-
     // ----------------------------------------------------------- response 解析
 
     JsonNode parseModel(String raw) {
@@ -233,11 +204,6 @@ public class ChunkParseService {
             throw new LlmOutputInvalidException("响应缺少 'model' 对象字段");
         }
         return model;
-    }
-
-    private static String textOr(JsonNode n, String field) {
-        JsonNode v = (n == null) ? null : n.get(field);
-        return (v == null || v.isNull()) ? "" : v.asText("");
     }
 
     private static String safe(String s) { return s == null ? "" : s; }

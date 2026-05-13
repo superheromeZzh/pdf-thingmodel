@@ -66,14 +66,14 @@ public class IngestionService {
         log.info("ingest start: file='{}' format={} pages={} bookmarks={}",
                 fileName, format, extract.getPageCount(), extract.getBookmarks().size());
 
-        // 2. 骨架抽取
+        // 2. 骨架抽取（文档摘要 + 检测到的 chunk 清单）
         ExtractedSkeleton skeleton = skeletonExtractor.extract(fileName, extract);
 
         // 3. INSERT documents
         Document doc = new Document();
         doc.setDocumentName(fileName);
         doc.setPageCount(extract.getPageCount());
-        doc.setSkeletonJson(skeleton.getSkeletonJson());
+        doc.setSummary(skeleton.getSummary());
         documentMapper.insert(doc);
         log.info("ingest doc inserted: documentId={} detectedChunks={}",
                 doc.getDocumentId(), skeleton.getDetectedChunks().size());

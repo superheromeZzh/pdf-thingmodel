@@ -4,7 +4,6 @@ import com.example.pdftm.entity.DocumentChunk;
 import com.example.pdftm.entity.ChunkModel;
 import com.example.pdftm.dto.ChunkContext;
 import com.example.pdftm.dto.PromptMessages;
-import com.fasterxml.jackson.databind.JsonNode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -89,12 +88,12 @@ public class PromptBuilder {
                                    String schema,
                                    String userRequest) {
         StringBuilder sb = new StringBuilder(8 * 1024);
-        JsonNode skeleton = ctx.getSkeleton();
 
-        // 1) 文档背景：skeleton 现在只剩一段 abstract
+        // 1) 文档背景：文档级摘要一段
         sb.append("# 文档背景\n");
-        String abstractText = text(skeleton, "abstract");
-        sb.append(abstractText.isEmpty() ? "(本文档无背景描述)" : abstractText).append('\n');
+        String docSummary = ctx.getDocumentSummary();
+        sb.append((docSummary == null || docSummary.isBlank())
+                ? "(本文档无背景描述)" : docSummary).append('\n');
 
         // 2) 当前 chunk 元信息
         DocumentChunk chunk = ctx.getChunk();
@@ -138,11 +137,6 @@ public class PromptBuilder {
         sb.append("\n# 用户本次请求\n").append(userRequest.trim()).append('\n');
         sb.append("\n# 你的输出\n");
         return sb.toString();
-    }
-
-    private static String text(JsonNode n, String field) {
-        JsonNode v = (n == null) ? null : n.get(field);
-        return (v == null || v.isNull()) ? "" : v.asText();
     }
 
     private static String safe(String s) { return s == null ? "" : s; }

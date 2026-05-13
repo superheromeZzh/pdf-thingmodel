@@ -26,11 +26,11 @@ CREATE TABLE IF NOT EXISTS documents (
     document_id     BIGSERIAL    PRIMARY KEY,
     document_name   VARCHAR(512) NOT NULL,
     page_count      INTEGER      NOT NULL,
-    -- 全局骨架，阶段 1 便宜 LLM 一次性产出（结构契约见 Document.java javadoc）
-    skeleton_json   JSONB,
+    -- 文档摘要（阶段 1 便宜 LLM 一次性产出）。一段 150-300 字叙述，给编辑期当文档语境。
+    summary         TEXT,
     created_at      TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
-COMMENT ON TABLE documents IS 'PDF 文档元信息 + 全局骨架';
+COMMENT ON TABLE documents IS 'PDF 文档元信息 + 文档摘要';
 
 -- 2) document_chunks：按 API/章节切的页段（append-only）
 CREATE TABLE IF NOT EXISTS document_chunks (

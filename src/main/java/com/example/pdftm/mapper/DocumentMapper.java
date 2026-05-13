@@ -10,7 +10,7 @@ import org.apache.ibatis.annotations.Param;
 public interface DocumentMapper {
 
     /**
-     * 按主键查询单条文档元信息（含 skeleton_json 全局骨架）。
+     * 按主键查询单条文档元信息（含 summary 文档摘要）。
      *
      * @param documentId 文档主键
      * @return 文档对象；不存在时返回 null
@@ -18,7 +18,7 @@ public interface DocumentMapper {
     Document selectById(@Param("documentId") Long documentId);
 
     /**
-     * 一次聚合算齐 chunk 总数 + 文档元信息 + skeleton_json，供首页卡片使用。
+     * 一次聚合算齐 chunk 总数 + 文档元信息 + summary，供首页卡片使用。
      *
      * @param documentId 文档主键
      * @return 概览 DTO；文档不存在时返回 null
