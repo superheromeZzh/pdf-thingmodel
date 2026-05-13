@@ -14,7 +14,7 @@ public class DocumentOverview {
     private String documentName;
     private Integer pageCount;
 
-    /** 全局骨架（outline + glossary）；前端可用来画目录树 + 术语 tooltip */
+    /** 全局骨架（当前结构：{ "abstract": "..." }）；前端文档卡片可直接显示 abstract */
     private JsonNode skeletonJson;
 
     /** 文档总 chunk 数；LEFT JOIN 聚合得出 */

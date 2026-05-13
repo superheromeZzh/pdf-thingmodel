@@ -10,12 +10,12 @@ import lombok.Data;
  * 喂给 LLM 的一次性上下文。
  *
  * skeleton 直接用 documents.skeleton_json 整个 JsonNode 传过去——
- * 里面同时包含 outline 和 glossary，PromptBuilder 自己挑字段拼 prompt。
+ * 极简形态当前只含 { "abstract": "..." }，PromptBuilder 自己挑字段拼 prompt。
  */
 @Data
 @Builder
 public class ChunkContext {
-    /** 文档全局骨架（outline + glossary 都在里面） */
+    /** 文档全局骨架（当前结构：{ "abstract": "..." }） */
     private JsonNode skeleton;
 
     /** 当前 chunk 的元信息和原文 */

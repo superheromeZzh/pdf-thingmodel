@@ -15,8 +15,8 @@ import java.util.List;
 public class ExtractedSkeleton {
 
     /**
-     * 全局骨架 JSON：documentMeta / summary / conventions / outline /
-     * sharedSchemas / apiIndex / glossary（结构契约见 Document.java）。
+     * 全局骨架 JSON：当前只含 { "abstract": "..." }
+     * （结构契约见 Document.java）。
      */
     private JsonNode skeletonJson;
 

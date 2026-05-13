@@ -14,7 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 组装"喂给 LLM 的一次性上下文"：骨架 + 当前 chunk + 当前物模型。
- * skeleton_json 直接整块传过去，PromptBuilder 自己挑 outline / glossary。
+ * skeleton_json 直接整块传过去（当前结构仅 { "abstract": "..." }），
+ * PromptBuilder 取出 abstract 作为文档背景拼 prompt。
  */
 @Service
 @RequiredArgsConstructor

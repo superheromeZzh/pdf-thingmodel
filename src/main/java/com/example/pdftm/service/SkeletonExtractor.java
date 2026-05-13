@@ -35,10 +35,19 @@ import java.util.stream.StreamSupport;
  * 输出严格 JSON：
  * <pre>
  * {
- *   "skeleton": { documentMeta, summary, conventions, outline, sharedSchemas, apiIndex, glossary },
+ *   "skeleton": { "abstract": "<一段 150-300 字的文档摘要>" },
  *   "detectedChunks": [ { chunkName, pageStart, pageEnd, summary } ]
  * }
  * </pre>
+ *
+ * 设计取舍：skeleton 只留一段叙述性 abstract 作为编辑期的文档语境。
+ * 任何"规则性"字段（conventions / scope.excludes / glossary）和
+ * "对 chunk 内容的索引"（outline / sharedSchemas / apiIndex）都不进
+ * skeleton——前者会让 LLM 在抽取时瞎填规则，后者会随 chunk 编辑坍塌。
+ * 真正的全局规则写在 PromptBuilder.buildSystemPrompt 里。
+ *
+ * pageEnd 由 LLM 直接给出"下一个 chunk 的 pageStart"（最后一个 = 总页数），
+ * 不做后处理；目的是用最简单的契约换一次实测，看准确度是否够用。
  */
 @Slf4j
 @Service
@@ -97,32 +106,7 @@ public class SkeletonExtractor {
                 # 输出 schema
                 {
                   "skeleton": {
-                    "documentMeta": {
-                      "docType":   "device_api_spec | datasheet | user_manual | sdk_doc",
-                      "product":   "...",
-                      "version":   "...",
-                      "publisher": "...",
-                      "publishDate":"YYYY-MM-DD",
-                      "language":  "zh | en | ..."
-                    },
-                    "summary": {
-                      "headline":  "<一行 40-60 字>",
-                      "abstract":  "<一段 150-300 字>",
-                      "highlights":["<3-5 个 bullet>"],
-                      "scope":     { "covers":[], "excludes":[], "audience":"..." }
-                    },
-                    "conventions": {
-                      "defaultUnits":   { "time":"second", "temperature":"celsius" },
-                      "naming":         "camelCase | snake_case",
-                      "responseFormat": "JSON | XML",
-                      "errorCodeFormat":"string | int | enum",
-                      "timestampFormat":"ISO-8601 | unix",
-                      "notes":          ["..."]
-                    },
-                    "outline":       [{"title":"...", "pageStart":1, "pageEnd":3, "level":1, "type":"overview | api_definition | ..."}],
-                    "sharedSchemas": [{"name":"Pagination", "definedAt":{"page":5}}],
-                    "apiIndex":      [{"apiName":"GET /...", "page":7, "summary":"..."}],
-                    "glossary":      [{"term":"...", "definition":"...", "pageRef":2}]
+                    "abstract": "<一段 150-300 字的文档摘要：覆盖范围、面向的产品/版本、关键内容>"
                   },
                   "detectedChunks": [
                     { "chunkName":"<API 名或章节标题>", "pageStart":1, "pageEnd":3, "summary":"<一句话>" }
@@ -132,10 +116,13 @@ public class SkeletonExtractor {
                 # 工作规则
                 1. detectedChunks 是后续单 chunk 物模型解析的目标；优先以书签为权威边界，
                    书签缺失时再从首尾页正文推断。
-                2. 每个 detectedChunk 必须给 pageStart/pageEnd 闭区间（1-based），pageEnd >= pageStart。
-                3. chunkName 必须在本文档内唯一（重名会被数据库 UNIQUE 约束拒绝）。
-                4. 没有把握的字段宁可留空字符串/空数组，不要编造。
-                5. 输出必须是合法 JSON，可以被 JSON.parse 直接解析。
+                2. detectedChunks 按 pageStart 升序排列，1-based。
+                3. pageEnd 规则：每个 chunk 的 pageEnd **必须等于下一个 chunk 的 pageStart**
+                   （即两个相邻 chunk 在边界页上重叠 1 页，避免漏掉跨页内容）；
+                   最后一个 chunk 的 pageEnd 等于"总页数"。
+                4. chunkName 必须在本文档内唯一（重名会被数据库 UNIQUE 约束拒绝）。
+                5. 没有把握的字段宁可留空字符串/空数组，不要编造。
+                6. 输出必须是合法 JSON，可以被 JSON.parse 直接解析。
                 """;
 
         StringBuilder user = new StringBuilder(8 * 1024);

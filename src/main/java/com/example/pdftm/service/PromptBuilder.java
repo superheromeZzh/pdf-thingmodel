@@ -18,7 +18,6 @@ import org.springframework.stereotype.Component;
 public class PromptBuilder {
 
     public static final int MAX_RAW_TEXT_CHARS = 12_000;
-    public static final int MAX_GLOSSARY_ENTRIES = 40;
     private static final int TOKEN_DIVISOR = 3;
 
     /**
@@ -63,7 +62,12 @@ public class PromptBuilder {
                 # 工作规则
                 1. 只修改用户明确要求改动的字段，其它字段必须保持不变。
                 2. 输出必须严格符合用户消息里给出的 thing-model JSON Schema。
-                3. 单位优先采用 SI；时间默认秒，温度默认摄氏。除非用户明确指定其它单位。
+                3. 默认约定（除非原文或用户明确指定其它）：
+                   - 单位：SI；时间秒，温度摄氏
+                   - 命名：camelCase
+                   - 时间戳：ISO-8601
+                   - 响应格式：JSON
+                   - 错误码：string
                 4. 修改前先在"原文片段"里找依据；找不到依据时不要编造，写到 warnings 里。
                 5. 用户仅说"改成 X"时默认指 default 字段；除非用户明确说"上限"/"下限"。
                 6. 修改字段时主动校验跨字段约束（如 default 必须落在 [min, max] 区间）。
@@ -87,43 +91,12 @@ public class PromptBuilder {
         StringBuilder sb = new StringBuilder(8 * 1024);
         JsonNode skeleton = ctx.getSkeleton();
 
-        // 1) 文档背景（documentMeta + summary）：让模型一句话知道在改哪本书
+        // 1) 文档背景：skeleton 现在只剩一段 abstract
         sb.append("# 文档背景\n");
-        appendDocumentBackground(sb, skeleton);
+        String abstractText = text(skeleton, "abstract");
+        sb.append(abstractText.isEmpty() ? "(本文档无背景描述)" : abstractText).append('\n');
 
-        // 2) 文档骨架（outline）
-        sb.append("\n# 文档骨架\n");
-        if (skeleton != null && skeleton.has("outline")) {
-            sb.append(skeleton.get("outline").toPrettyString()).append('\n');
-        } else {
-            sb.append("(本文档暂无骨架信息)\n");
-        }
-
-        // 3) 全局约定（conventions）：默认单位/命名/错误码格式
-        JsonNode conventions = (skeleton != null) ? skeleton.get("conventions") : null;
-        if (conventions != null && !conventions.isEmpty()) {
-            sb.append("\n# 全局约定\n");
-            sb.append(conventions.toPrettyString()).append('\n');
-        }
-
-        // 4) 全局术语表（来自 skeleton.glossary）
-        sb.append("\n# 全局术语表\n");
-        JsonNode glossary = (skeleton != null) ? skeleton.get("glossary") : null;
-        if (glossary == null || !glossary.isArray() || glossary.isEmpty()) {
-            sb.append("(无)\n");
-        } else {
-            int n = Math.min(glossary.size(), MAX_GLOSSARY_ENTRIES);
-            for (int i = 0; i < n; i++) {
-                JsonNode g = glossary.get(i);
-                sb.append("- **").append(text(g, "term")).append("**: ")
-                  .append(text(g, "definition")).append('\n');
-            }
-            if (glossary.size() > n) {
-                sb.append("- (省略 ").append(glossary.size() - n).append(" 条)\n");
-            }
-        }
-
-        // 5) 当前 chunk 元信息
+        // 2) 当前 chunk 元信息
         DocumentChunk chunk = ctx.getChunk();
         sb.append("\n# 当前修改对象\n")
           .append("- 名称: ").append(safe(chunk.getChunkName())).append('\n')
@@ -133,11 +106,11 @@ public class PromptBuilder {
             sb.append("- 摘要: ").append(chunk.getSummary()).append('\n');
         }
 
-        // 6) Schema
+        // 3) Schema
         sb.append("\n# 物模型 JSON Schema\n");
         sb.append(schema == null ? "(未提供，按当前 model 结构推断)" : schema).append('\n');
 
-        // 7) 当前物模型
+        // 4) 当前物模型
         sb.append("\n# 当前物模型\n");
         ChunkModel current = ctx.getCurrentThingModel();
         if (current == null || current.getThingModel() == null) {
@@ -146,7 +119,7 @@ public class PromptBuilder {
             sb.append(current.getThingModel().toPrettyString()).append('\n');
         }
 
-        // 8) 原文片段（截断）
+        // 5) 原文片段（截断）
         sb.append("\n# 原文片段 (p.").append(chunk.getPageStart())
           .append('-').append(chunk.getPageEnd()).append(")\n");
         String rawText = chunk.getRawText();
@@ -161,61 +134,10 @@ public class PromptBuilder {
               .append(" 字符]\n");
         }
 
-        // 9) 用户请求
+        // 6) 用户请求
         sb.append("\n# 用户本次请求\n").append(userRequest.trim()).append('\n');
         sb.append("\n# 你的输出\n");
         return sb.toString();
-    }
-
-    /**
-     * 拼"文档背景"段。优先级：summary.abstract > summary.headline > documentMeta 拼凑 > 占位文本。
-     * documentMeta（产品/版本/类型）即使有 summary 也额外列一行——这些 anchor 字段
-     * 比段落文本更稳定，模型抓取效率高。
-     */
-    private void appendDocumentBackground(StringBuilder sb, JsonNode skeleton) {
-        JsonNode meta = (skeleton != null) ? skeleton.get("documentMeta") : null;
-        JsonNode summary = (skeleton != null) ? skeleton.get("summary") : null;
-
-        // (1) 一行 anchor：产品 + 版本 + 类型
-        if (meta != null && !meta.isEmpty()) {
-            String product   = text(meta, "product");
-            String version   = text(meta, "version");
-            String docType   = text(meta, "docType");
-            String publisher = text(meta, "publisher");
-            StringBuilder line = new StringBuilder();
-            if (!product.isEmpty())   line.append(product);
-            if (!version.isEmpty())   line.append(' ').append(version);
-            if (!docType.isEmpty())   line.append("（").append(docType).append("）");
-            if (!publisher.isEmpty()) line.append(" / ").append(publisher);
-            if (line.length() > 0) {
-                sb.append("- ").append(line).append('\n');
-            }
-        }
-
-        // (2) 摘要段
-        String abstractText = text(summary, "abstract");
-        String headline     = text(summary, "headline");
-        if (!abstractText.isEmpty()) {
-            sb.append(abstractText).append('\n');
-        } else if (!headline.isEmpty()) {
-            sb.append(headline).append('\n');
-        } else if (meta == null || meta.isEmpty()) {
-            sb.append("(本文档无背景描述)\n");
-        }
-
-        // (3) scope.excludes：明确告诉模型"哪些事不在本文档"，避免编造
-        JsonNode scope = (summary == null) ? null : summary.get("scope");
-        if (scope != null) {
-            JsonNode excludes = scope.get("excludes");
-            if (excludes != null && excludes.isArray() && excludes.size() > 0) {
-                sb.append("- 不在本文档范围: ");
-                for (int i = 0; i < excludes.size(); i++) {
-                    if (i > 0) sb.append("、");
-                    sb.append(excludes.get(i).asText());
-                }
-                sb.append('\n');
-            }
-        }
     }
 
     private static String text(JsonNode n, String field) {
